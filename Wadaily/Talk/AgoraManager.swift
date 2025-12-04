@@ -12,12 +12,15 @@ import Combine
 // MARK: - Agora Manager
 class AgoraManager: NSObject {
     var agoraKit: AgoraRtcEngineKit!
+    private let tokenRepository: AgoraTokenRepositoryProtocol
     
-    init(delegate: AgoraRtcEngineDelegate) {
+    init(delegate: AgoraRtcEngineDelegate, tokenRepository: AgoraTokenRepositoryProtocol = AgoraTokenRepository()) {
         // Info.plistからAgoraAppIdを取得
         guard let appId = Bundle.main.object(forInfoDictionaryKey: "AgoraAppId") as? String else {
             fatalError("AgoraAppId not found in Info.plist")
         }
+        
+        self.tokenRepository = tokenRepository
         
         super.init()
         
@@ -29,7 +32,16 @@ class AgoraManager: NSObject {
         agoraKit.setChannelProfile(.communication)
     }
     
-    func joinChannel(channelName: String, token: String? = nil, uid: UInt = 0) {
+    func joinChannel(channelName: String, uid: UInt = 0, role: String = "publisher") async throws {
+        // トークンを取得
+        let token = try await tokenRepository.getToken(
+            channelName: channelName,
+            uid: uid,
+            role: role,
+            tokenExpirationInSeconds: nil,
+            privilegeExpirationInSeconds: nil
+        )
+        
         let option = AgoraRtcChannelMediaOptions()
         option.channelProfile = .communication
         option.clientRoleType = .broadcaster
