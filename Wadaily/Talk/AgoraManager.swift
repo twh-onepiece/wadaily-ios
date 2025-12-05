@@ -42,6 +42,8 @@ class AgoraManager: NSObject {
             privilegeExpirationInSeconds: nil
         )
         
+        print("fetched token: \(token)")
+        
         let option = AgoraRtcChannelMediaOptions()
         option.channelProfile = .communication
         option.clientRoleType = .broadcaster

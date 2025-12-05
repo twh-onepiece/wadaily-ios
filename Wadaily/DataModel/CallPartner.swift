@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct CallPartner: Identifiable {
+struct CallPartner: Identifiable, Equatable, Hashable {
     let id = UUID()
     let name: String
     let imageUrl: String?
@@ -17,5 +17,9 @@ struct CallPartner: Identifiable {
     
     var isOnline: Bool {
         status == "online"
+    }
+    
+    static func == (lhs: CallPartner, rhs: CallPartner) -> Bool {
+        lhs.id == rhs.id
     }
 }

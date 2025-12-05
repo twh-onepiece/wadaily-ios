@@ -16,6 +16,13 @@ struct User: Codable {
         self.backgroundImageData = backgroundImageData
         self.profileText = profileText
     }
+    
+    /// Agora用の32ビット符号付き整数のUserIDを生成
+    /// userIdのハッシュ値から生成（衝突の可能性はあるが、実用上は問題ない）
+    var agoraUserId: UInt {
+        let hash = abs(userId.hashValue)
+        return UInt(hash & 0x7FFFFFFF) // 31ビットに制限（正の値のみ）
+    }
 }
 
 enum AuthState {
