@@ -20,7 +20,14 @@ protocol AgoraTokenRepositoryProtocol {
 
 // MARK: - Agora Token Repository
 class AgoraTokenRepository: AgoraTokenRepositoryProtocol {
-    private let baseURL = "YOUR_API_BASE_URL" // APIのベースURLを設定してください
+    private let baseURL: String
+    
+    init() {
+        guard let url = Bundle.main.object(forInfoDictionaryKey: "WadailyAPI") as? String else {
+            fatalError("WadailyAPI not found in Info.plist")
+        }
+        self.baseURL = url
+    }
     
     func getToken(
         channelName: String,
@@ -59,12 +66,24 @@ class AgoraTokenRepository: AgoraTokenRepositoryProtocol {
         }
         
         // レスポンスからトークンを取得
-        // APIのレスポンス形式に応じて調整してください
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let token = json["token"] as? String {
-            return token
+        struct TokenResponse: Codable {
+            let token: String
+            let channelName: String
+            let uid: Int
+            let role: String
+            let expiresIn: Int
+            
+            enum CodingKeys: String, CodingKey {
+                case token
+                case channelName = "channel_name"
+                case uid
+                case role
+                case expiresIn = "expires_in"
+            }
         }
         
-        throw URLError(.cannotParseResponse)
+        let decoder = JSONDecoder()
+        let tokenResponse = try decoder.decode(TokenResponse.self, from: data)
+        return tokenResponse.token
     }
 }
