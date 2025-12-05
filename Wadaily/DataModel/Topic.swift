@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct Topic {
+struct Topic: Hashable {
     let title: String
     let color: Color
 }

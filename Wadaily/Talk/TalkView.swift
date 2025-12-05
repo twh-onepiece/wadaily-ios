@@ -9,7 +9,8 @@ import SwiftUI
 
 struct TalkView: View {
     @StateObject private var viewModel = TalkViewModel()
-    @State private var channelName = ""
+    let channelName: String
+    let partnerName: String
     
     var body: some View {
         ZStack {
@@ -37,7 +38,7 @@ struct TalkView: View {
                         )
                         .shadow(radius: 10)
                     
-                    Text("urassh")
+                    Text(partnerName)
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
@@ -93,7 +94,7 @@ struct TalkView: View {
                 } else {
                     // 通話開始ボタン
                     Button(action: {
-                        viewModel.joinChannel(channelName: "test-channel")
+                        viewModel.joinChannel(channelName: channelName)
                     }) {
                         VStack(spacing: 8) {
                             Image(systemName: "phone.fill")
@@ -127,5 +128,5 @@ struct TalkView: View {
 }
 
 #Preview {
-    TalkView()
+    TalkView(channelName: "test", partnerName: "Sample User")
 }
