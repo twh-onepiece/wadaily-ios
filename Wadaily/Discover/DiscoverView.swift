@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct DiscoverView: View {
+    @State private var selectedPartner: CallPartner?
     
     // サンプルデータ
     let partners = [
@@ -18,24 +19,29 @@ struct DiscoverView: View {
     ]
     
     var body: some View {
-        ZStack {
-            AnimatedBackground()
-            
-            VStack {
-                Text("Wadaily")
-                    .font(Font.largeTitle.bold())
-                Text("話し相手をみつけよう")
-                    .font(.callout)
+        NavigationStack {
+            ZStack {
+                AnimatedBackground()
                 
-                ScrollView {
-                    ForEach(partners) { partner in
-                        CallPartnerCell(partner: partner)
-                            .shadow(radius: 5)
-                            .padding(8)
+                VStack {
+                    Text("Wadaily")
+                        .font(Font.largeTitle.bold())
+                    Text("話し相手をみつけよう")
+                        .font(.callout)
+                    
+                    ScrollView {
+                        ForEach(partners) { partner in
+                            CallPartnerCell(partner: partner)
+                                .shadow(radius: 5)
+                                .padding(8)
+                        }
                     }
                 }
+                .padding()
             }
-            .padding()
+            .navigationDestination(item: $selectedPartner) { partner in
+                TalkView(channelName: "test", partnerName: partner.name)
+            }
         }
     }
 }
@@ -96,7 +102,7 @@ extension DiscoverView {
                 
                 // 通話ボタン
                 Button(action: {
-                    // 通話開始処理
+                    selectedPartner = partner
                 }) {
                     Image(systemName: "phone.fill")
                         .foregroundColor(.white)
