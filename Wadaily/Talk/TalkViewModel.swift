@@ -9,28 +9,30 @@ import Combine
 import AgoraRtcKit
 
 enum TalkViewState {
-    case Before
-    case Waiting
-    case Talking
-    case Talked
+    case disconnected      // 未接続
+    case connecting        // 接続中
+    case channelJoined     // チャンネル joined
+    case talking           // 通話中
+    case callEnded         // 通話終了
 }
 
 protocol AgoraEngineCoordinatorDelegate: AnyObject {
+    func didMyUserJoined(uid: UInt)
+    func didPartnerJoined(uid: UInt)
+    func didUserOffline(uid: UInt)
     func didLeaveChannel()
     func didOccurError()
-    func didUserJoined(uid: UInt)
-    func didUserOffline(uid: UInt)
 }
 
 class TalkViewModel: ObservableObject {
-    @Published var state: TalkViewState = .Before
+    @Published var state: TalkViewState = .disconnected
     @Published var isMuted: Bool = false
     @Published var myUserId: UInt = 0
     @Published var partnerUserId: UInt?
     
     private var agoraManager: AgoraManager?
     private var coordinator: AgoraEngineCoordinator?
-    
+
     init() {
         coordinator = AgoraEngineCoordinator(delegate: self)
         if let coordinator = coordinator {
@@ -39,12 +41,14 @@ class TalkViewModel: ObservableObject {
     }
     
     func joinChannel(channelName: String, uid: UInt = 0) {
+        state = .connecting
+        myUserId = 0
+        partnerUserId = nil
         Task {
             do {
                 try await agoraManager?.joinChannel(channelName: channelName, uid: uid)
-                state = .Waiting
             } catch {
-                state = .Before
+                state = .disconnected
                 print("Failed to join channel: \(error)")
             }
         }
@@ -65,34 +69,35 @@ class TalkViewModel: ObservableObject {
 }
 
 extension TalkViewModel: AgoraEngineCoordinatorDelegate {
-    func didUserJoined(uid: UInt) {
-        if myUserId == 0 {
-            // 自分の参加
-            myUserId = uid
-            state = .Waiting
-            print("I joined with uid: \(uid)")
-        } else if uid != myUserId {
-            // 相手の参加
-            partnerUserId = uid
-            state = .Talking
-            print("Partner joined with uid: \(uid)")
-        }
+    func didMyUserJoined(uid: UInt) {
+        myUserId = uid
+        state = .channelJoined
+        print("I joined with uid: \(uid)")
+    }
+    
+    func didPartnerJoined(uid: UInt) {
+        partnerUserId = uid
+        state = .talking
+        print("Partner joined with ui: \(uid)")
     }
     
     func didUserOffline(uid: UInt) {
-        if uid == partnerUserId {
-            partnerUserId = nil
-            print("Partner left with uid: \(uid)")
-        }
+        partnerUserId = nil
+        state = .channelJoined
+        print("Partner left with uid: \(uid)")
     }
     
     func didLeaveChannel() {
-        state = .Talked
+        state = .callEnded
+        myUserId = 0
+        partnerUserId = nil
         print("Left channel")
     }
     
     func didOccurError() {
-        state = .Before
+        state = .disconnected
+        myUserId = 0
+        partnerUserId = nil
         print("Error occurred")
     }
 }
@@ -107,14 +112,23 @@ class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate {
     
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinChannel channel: String, withUid uid: UInt, elapsed: Int) {
         // 自分の参加
-        delegate?.didUserJoined(uid: uid)
+        delegate?.didMyUserJoined(uid: uid)
         print("Successfully joined channel: \(channel) with uid: \(uid)")
     }
     
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinedOfUid uid: UInt, elapsed: Int) {
-        // 他ユーザーの参加
-        delegate?.didUserJoined(uid: uid)
-        print("User joined with uid: \(uid)")
+        // 他ユーザーの参加(新規参加 + 既存ユーザー)
+        delegate?.didPartnerJoined(uid: uid)
+        print("Remote user joined with uid: \(uid)")
+    }
+    
+    // リモートオーディオストリームの状態変化を検知(既存ユーザーの確実な検知用)
+    func rtcEngine(_ engine: AgoraRtcEngineKit, remoteAudioStateChangedOfUid uid: UInt, state: AgoraAudioRemoteState, reason: AgoraAudioRemoteReason, elapsed: Int) {
+        if state == .decoding || state == .starting {
+            // リモートユーザーのオーディオストリームが開始された
+            print("Remote audio started for uid: \(uid)")
+            delegate?.didPartnerJoined(uid: uid)
+        }
     }
     
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
