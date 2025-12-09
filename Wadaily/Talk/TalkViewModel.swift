@@ -16,14 +16,6 @@ enum TalkViewState {
     case callEnded         // 通話終了
 }
 
-protocol AgoraEngineCoordinatorDelegate: AnyObject {
-    func didMyUserJoined(uid: UInt)
-    func didPartnerJoined(uid: UInt)
-    func didUserOffline(uid: UInt)
-    func didLeaveChannel()
-    func didOccurError()
-}
-
 class TalkViewModel: ObservableObject {
     @Published var state: TalkViewState = .disconnected
     @Published var isMuted: Bool = false
@@ -47,7 +39,6 @@ class TalkViewModel: ObservableObject {
         Task {
             do {
                 try await agoraManager?.joinChannel(channelName: channelName, uid: uid)
-                state = .channelJoined
             } catch {
                 state = .disconnected
                 print("Failed to join channel: \(error)")
@@ -100,39 +91,5 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
         myUserId = 0
         partnerUserId = nil
         print("Error occurred")
-    }
-}
-
-class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate {
-    weak var delegate: AgoraEngineCoordinatorDelegate?
-    
-    init(delegate: AgoraEngineCoordinatorDelegate) {
-        self.delegate = delegate
-        super.init()
-    }
-    
-    func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinChannel channel: String, withUid uid: UInt, elapsed: Int) {
-        delegate?.didMyUserJoined(uid: uid)
-        print("Successfully joined channel: \(channel) with uid: \(uid)")
-    }
-    
-    func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinedOfUid uid: UInt, elapsed: Int) {
-        delegate?.didPartnerJoined(uid: uid)
-        print("User joined with uid: \(uid)")
-    }
-    
-    func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
-        delegate?.didUserOffline(uid: uid)
-        print("User offline with uid: \(uid), reason: \(reason.rawValue)")
-    }
-    
-    func rtcEngine(_ engine: AgoraRtcEngineKit, didLeaveChannelWith stats: AgoraChannelStats) {
-        delegate?.didLeaveChannel()
-        print("Left channel")
-    }
-    
-    func rtcEngine(_ engine: AgoraRtcEngineKit, didOccurError errorCode: AgoraErrorCode) {
-        delegate?.didOccurError()
-        print("Error occurred: \(errorCode.rawValue)")
     }
 }
