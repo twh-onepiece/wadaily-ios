@@ -9,29 +9,30 @@ import Combine
 import AgoraRtcKit
 
 enum TalkViewState {
-    case Before
-    case Waiting
-    case Talking
-    case Talked
+    case disconnected      // 未接続
+    case connecting        // 接続中
+    case channelJoined     // チャンネル joined
+    case talking           // 通話中
+    case callEnded         // 通話終了
 }
 
 protocol AgoraEngineCoordinatorDelegate: AnyObject {
-    func didLeaveChannel()
-    func didOccurError()
-    func didMyJoined(uid: UInt)
+    func didMyUserJoined(uid: UInt)
     func didPartnerJoined(uid: UInt)
     func didUserOffline(uid: UInt)
+    func didLeaveChannel()
+    func didOccurError()
 }
 
 class TalkViewModel: ObservableObject {
-    @Published var state: TalkViewState = .Before
+    @Published var state: TalkViewState = .disconnected
     @Published var isMuted: Bool = false
     @Published var myUserId: UInt = 0
     @Published var partnerUserId: UInt?
     
     private var agoraManager: AgoraManager?
     private var coordinator: AgoraEngineCoordinator?
-    
+
     init() {
         coordinator = AgoraEngineCoordinator(delegate: self)
         if let coordinator = coordinator {
@@ -40,12 +41,15 @@ class TalkViewModel: ObservableObject {
     }
     
     func joinChannel(channelName: String, uid: UInt = 0) {
+        state = .connecting
+        myUserId = 0
+        partnerUserId = nil
         Task {
             do {
                 try await agoraManager?.joinChannel(channelName: channelName, uid: uid)
-                state = .Waiting
+                state = .channelJoined
             } catch {
-                state = .Before
+                state = .disconnected
                 print("Failed to join channel: \(error)")
             }
         }
@@ -66,33 +70,35 @@ class TalkViewModel: ObservableObject {
 }
 
 extension TalkViewModel: AgoraEngineCoordinatorDelegate {
-    func didMyJoined(uid: UInt) {
+    func didMyUserJoined(uid: UInt) {
         myUserId = uid
-        state = .Waiting
+        state = .channelJoined
         print("I joined with uid: \(uid)")
     }
     
     func didPartnerJoined(uid: UInt) {
         partnerUserId = uid
-        state = .Talking
+        state = .talking
         print("Partner joined with uid: \(uid)")
     }
     
     func didUserOffline(uid: UInt) {
-        if uid == partnerUserId {
-            partnerUserId = nil
-            print("Partner left with uid: \(uid)")
-        }
-        state = .Talked
+        partnerUserId = nil
+        state = .callEnded
+        print("Partner joined with ui: \(uid)")
     }
     
     func didLeaveChannel() {
-        state = .Talked
+        state = .callEnded
+        myUserId = 0
+        partnerUserId = nil
         print("Left channel")
     }
     
     func didOccurError() {
-        state = .Before
+        state = .disconnected
+        myUserId = 0
+        partnerUserId = nil
         print("Error occurred")
     }
 }
@@ -106,7 +112,7 @@ class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate {
     }
     
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinChannel channel: String, withUid uid: UInt, elapsed: Int) {
-        delegate?.didMyJoined(uid: uid)
+        delegate?.didMyUserJoined(uid: uid)
         print("Successfully joined channel: \(channel) with uid: \(uid)")
     }
     
