@@ -14,22 +14,9 @@
 		10799A142ED88C1D00CEC295 /* Wadaily.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wadaily.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		108BB3882EDF39960006A911 /* Exceptions for "Wadaily" folder in "Wadaily" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 10799A132ED88C1D00CEC295 /* Wadaily */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		10799A162ED88C1D00CEC295 /* Wadaily */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				108BB3882EDF39960006A911 /* Exceptions for "Wadaily" folder in "Wadaily" target */,
-			);
 			path = Wadaily;
 			sourceTree = "<group>";
 		};
