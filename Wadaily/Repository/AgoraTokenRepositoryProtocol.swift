@@ -23,11 +23,10 @@ class AgoraTokenRepository: AgoraTokenRepositoryProtocol {
     private let baseURL: String
     
     init() {
-        guard let url = Bundle.main.object(forInfoDictionaryKey: "WadailyAPI") as? String else {
-            fatalError("WadailyAPI not found in Info.plist")
-        }
-        self.baseURL = url
+        self.baseURL = "https://wadaily-backend-1011560404154.asia-northeast1.run.app"
     }
+    
+   
     
     func getToken(
         channelName: String,

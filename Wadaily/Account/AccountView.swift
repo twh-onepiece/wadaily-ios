@@ -9,18 +9,16 @@ import SwiftUI
 
 struct AccountView: View {
     // サンプルデータ
-    let userId = "urassh"
-    let userName = "うらっしゅ"
-    let userIcon = "guest1"
-    let backgroundImage = "garden"
+    let me: Account
+    @ObservedObject var authViewModel: AuthViewModel
     
     // 通話履歴のサンプルデータ
-    let callHistory = [
-        CallHistory(partnerName: "Sui", partnerImageUrl: nil, backgroundImageUrl: nil, callDate: Date().addingTimeInterval(-86400)),
-        CallHistory(partnerName: "Tsukasa", partnerImageUrl: nil, backgroundImageUrl: nil, callDate: Date().addingTimeInterval(-172800)),
-        CallHistory(partnerName: "toku", partnerImageUrl: nil, backgroundImageUrl: nil, callDate: Date().addingTimeInterval(-259200)),
-        CallHistory(partnerName: "Alex", partnerImageUrl: nil, backgroundImageUrl: nil, callDate: Date().addingTimeInterval(-345600)),
-    ]
+    let callHistory = DummyCallHistory.histories
+    
+    init(me: Account, authViewModel: AuthViewModel) {
+        self.me = me
+        self.authViewModel = authViewModel
+    }
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -28,7 +26,7 @@ struct AccountView: View {
             ZStack {
                 // 背景画像
                 VStack {
-                    Image(backgroundImage)
+                    Image(me.backgroundUrl)
                         .resizable()
                         .scaledToFill()
                         .frame(height: 160)
@@ -40,7 +38,7 @@ struct AccountView: View {
                 
                 VStack {
                     // アイコン
-                    Image(userIcon)
+                    Image(me.iconUrl)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 120, height: 120)
@@ -51,12 +49,12 @@ struct AccountView: View {
                         )
                         .shadow(radius: 10)
                     
-                    Text(userName)
+                    Text(me.name)
                         .font(.title)
                         .bold()
                         .shadow(radius: 5)
                     
-                    Text("@\(userId)")
+                    Text("@\(me.userId)")
                         .font(.subheadline)
                         .foregroundColor(.black.opacity(0.8))
                         .shadow(radius: 3)
@@ -99,6 +97,24 @@ struct AccountView: View {
                             RoundedRectangle(cornerRadius: 8)
                         )
                 }
+                
+                Spacer()
+                
+                Button(action: {
+                    Task {
+                        await authViewModel.logout()
+                    }
+                }) {
+                    Text("Logout")
+                        .foregroundStyle(.white)
+                        .font(.callout)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 6)
+                        .background(.red)
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: 8)
+                        )
+                }
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 8)
@@ -134,9 +150,23 @@ extension AccountView {
     private func CallHistoryCell(history: CallHistory) -> some View {
         ZStack {
             // 背景
-            if history.backgroundImageUrl != nil {
-                // TODO: 実際の画像URLから読み込み
-                Color.blue.opacity(0.3)
+            if !history.partner.backgroundImageUrl.isEmpty {
+                Image(history.partner.backgroundImageUrl)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 140)
+                    .opacity(0.2)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 36)
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.white, .blue]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .opacity(0.3)
+                    }
             } else {
                 Image("hotel")
                     .resizable()
@@ -158,14 +188,14 @@ extension AccountView {
             
             HStack {
                 // プロフィール画像
-                Image("guest2")
+                Image(history.partner.imageUrl)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 70, height: 70)
                     .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(history.partnerName)
+                    Text(history.partner.name)
                         .font(.headline)
                         .bold()
                     
@@ -187,6 +217,6 @@ extension AccountView {
 }
 
 #Preview {
-    AccountView()
+    AccountView(me: DummyAccount.urassh, authViewModel: AuthViewModel(authRepository: MockAuthRepository()))
 }
 

@@ -2,34 +2,38 @@ import Foundation
 import SwiftUI
 import Combine
 
+enum AuthState {
+    case loading
+    case authenticated(Account)
+    case unauthenticated
+}
+
 @MainActor
 class AuthViewModel: ObservableObject {
     @Published var authState: AuthState = .loading
     @Published var errorMessage: String?
     
     private let authRepository: AuthRepositoryProtocol
-    private let localStorage: LocalStorageProtocol
-    private let userStorageKey = "currentUser"
+    private let accountManager = AccountManager.shared
     
-    init(authRepository: AuthRepositoryProtocol, localStorage: LocalStorageProtocol) {
+    init(authRepository: AuthRepositoryProtocol) {
         self.authRepository = authRepository
-        self.localStorage = localStorage
         checkAuthState()
     }
     
     func checkAuthState() {
         authState = .loading
         Task {
-            do {
-                if let user = try localStorage.load(forKey: userStorageKey, as: User.self) {
-                    authState = .authenticated(user)
-                } else {
-                    authState = .unauthenticated
-                }
-            } catch {
+            if let account = accountManager.currentAccount {
+                authState = .authenticated(account)
+            } else {
                 authState = .unauthenticated
             }
         }
+    }
+    
+    var currentAccount: Account? {
+        accountManager.currentAccount
     }
     
     func register(email: String, password: String, userId: String, iconImageData: Data?, backgroundImageData: Data?, profileText: String?) async {
@@ -37,7 +41,7 @@ class AuthViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            let user = try await authRepository.register(
+            let account = try await authRepository.register(
                 email: email,
                 password: password,
                 userId: userId,
@@ -45,8 +49,8 @@ class AuthViewModel: ObservableObject {
                 backgroundImageData: backgroundImageData,
                 profileText: profileText
             )
-            try localStorage.save(user, forKey: userStorageKey)
-            authState = .authenticated(user)
+            accountManager.saveAccount(account)
+            authState = .authenticated(account)
         } catch {
             errorMessage = error.localizedDescription
             authState = .unauthenticated
@@ -58,9 +62,9 @@ class AuthViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            let user = try await authRepository.login(userId: userId, password: password)
-            try localStorage.save(user, forKey: userStorageKey)
-            authState = .authenticated(user)
+            let account = try await authRepository.login(userId: userId, password: password)
+            accountManager.saveAccount(account)
+            authState = .authenticated(account)
         } catch {
             errorMessage = error.localizedDescription
             authState = .unauthenticated
@@ -70,10 +74,16 @@ class AuthViewModel: ObservableObject {
     func logout() async {
         do {
             try await authRepository.logout()
-            try localStorage.delete(forKey: userStorageKey)
+            accountManager.logout()
             authState = .unauthenticated
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+    
+    // ダミーアカウントでログイン
+    func loginWithDummyAccount(_ account: Account) {
+        accountManager.saveAccount(account)
+        authState = .authenticated(account)
     }
 }

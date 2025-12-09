@@ -8,15 +8,14 @@
 import SwiftUI
 
 struct DiscoverView: View {
-    @State private var selectedPartner: CallPartner?
+    @StateObject private var viewModel: DiscoverViewModel
+    @State private var selectedPartner: Caller?
+    let me: Caller
     
-    // サンプルデータ
-    let partners = [
-        CallPartner(name: "うらっしゅ", imageUrl: nil, backgroundImageUrl: nil, status: "online", topics: []),
-        CallPartner(name: "Sui", imageUrl: nil, backgroundImageUrl: nil, status: "online", topics: []),
-        CallPartner(name: "Tsukasa", imageUrl: nil, backgroundImageUrl: nil, status: "offline", topics: []),
-        CallPartner(name: "toku", imageUrl: nil, backgroundImageUrl: nil, status: "online", topics: []),
-    ]
+    init(me: Caller) {
+        self.me = me
+        _viewModel = StateObject(wrappedValue: DiscoverViewModel(me: me))
+    }
     
     var body: some View {
         NavigationStack {
@@ -29,58 +28,65 @@ struct DiscoverView: View {
                     Text("話し相手をみつけよう")
                         .font(.callout)
                     
-                    ScrollView {
-                        ForEach(partners) { partner in
-                            CallPartnerCell(partner: partner)
-                                .shadow(radius: 5)
-                                .padding(8)
+                    if viewModel.isLoading {
+                        ProgressView("読み込み中...")
+                            .padding()
+                    } else if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .padding()
+                    } else {
+                        ScrollView {
+                            ForEach(viewModel.partners) { partner in
+                                CallPartnerCell(partner: partner)
+                                    .shadow(radius: 5)
+                                    .padding(8)
+                            }
                         }
                     }
                 }
                 .padding()
             }
             .navigationDestination(item: $selectedPartner) { partner in
-                TalkView(channelName: "test", partnerName: partner.name)
+                TalkView(me: me, partner: partner)
+            }
+            .task {
+                await viewModel.fetchPartners()
             }
         }
     }
 }
 
 extension DiscoverView {
-    private func CallPartnerCell(partner: CallPartner) -> some View {
+    private func CallPartnerCell(partner: Caller) -> some View {
         ZStack {
             // 背景画像またはデフォルト背景
-            if partner.backgroundImageUrl != nil {
-                // TODO: 実際の画像URLから読み込み
-                Color.blue.opacity(0.3)
-            } else {
-                Image("hotel")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 160)
-                    .opacity(0.2)
-                    .overlay {
-                        if partner.isOnline {
-                            RoundedRectangle(cornerRadius: 36)
-                                .fill(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.white, .green]), startPoint: .top, endPoint: .bottom))
-                                .opacity(0.3)
-                        }
-                        else
-                        {
-                            RoundedRectangle(cornerRadius: 36)
-                                .fill(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.white, .gray]), startPoint: .top, endPoint: .bottom))
-                                .opacity(0.3)
-                        }
+            Image(partner.backgroundImageUrl)
+                .resizable()
+                .scaledToFill()
+                .frame(height: 160)
+                .opacity(0.2)
+                .overlay {
+                    if partner.isOnline {
+                        RoundedRectangle(cornerRadius: 36)
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.white, .green]), startPoint: .top, endPoint: .bottom))
+                            .opacity(0.3)
                     }
-            }
+                    else
+                    {
+                        RoundedRectangle(cornerRadius: 36)
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.white, .gray]), startPoint: .top, endPoint: .bottom))
+                            .opacity(0.3)
+                    }
+                }
             
             HStack {
                 // プロフィール画像
-                Image("guest1")
+                Image(partner.imageUrl)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 80, height: 80)
@@ -123,5 +129,5 @@ extension DiscoverView {
 }
 
 #Preview {
-    DiscoverView()
+    DiscoverView(me: DummyCallPartner.previewMe)
 }
