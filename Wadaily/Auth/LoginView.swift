@@ -89,25 +89,8 @@ struct LoginView: View {
 }
 
 #Preview {
-    class MockAuthRepository: AuthRepositoryProtocol {
-        func register(email: String, password: String, userId: String, iconImageData: Data?, backgroundImageData: Data?, profileText: String?) async throws -> User {
-            return User(id: "1", email: email, userId: userId, iconImageData: iconImageData, backgroundImageData: backgroundImageData, profileText: profileText)
-        }
-        
-        func login(userId: String, password: String) async throws -> User {
-            return User(id: "1", email: "test@example.com", userId: userId)
-        }
-        
-        func logout() async throws {}
-        
-        func getCurrentUser() async throws -> User? {
-            return nil
-        }
-    }
-    
     let mockAuthRepo = MockAuthRepository()
-    let mockStorage = UserDefaultsStorage()
-    let viewModel = AuthViewModel(authRepository: mockAuthRepo, localStorage: mockStorage)
+    let viewModel = AuthViewModel(authRepository: mockAuthRepo)
     
-    return LoginView(viewModel: viewModel)
+    LoginView(viewModel: viewModel)
 }

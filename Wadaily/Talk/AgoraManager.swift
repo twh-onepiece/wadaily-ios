@@ -9,10 +9,12 @@ import SwiftUI
 import AgoraRtcKit
 import Combine
 
+// コールバック(delegate)を定義するインターフェース(protocol)
+// 理由: 直接ViewModelにAgoraRtcEngineDelegateが適用できないため、Coordinatorを挟んでいる。
 protocol AgoraEngineCoordinatorDelegate: AnyObject {
-    func didMyUserJoined(uid: UInt)
+    func didJoined(uid: UInt)
     func didPartnerJoined(uid: UInt)
-    func didUserOffline(uid: UInt)
+    func didPartnerLeave(uid: UInt)
     func didLeaveChannel()
     func didOccurError()
 }
@@ -90,7 +92,7 @@ class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate {
     }
     
     func rtcEngine(_ engine: AgoraRtcEngineKit, didJoinChannel channel: String, withUid uid: UInt, elapsed: Int) {
-        delegate?.didMyUserJoined(uid: uid)
+        delegate?.didJoined(uid: uid)
         print("Successfully joined channel: \(channel) with uid: \(uid)")
     }
     
@@ -100,7 +102,7 @@ class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate {
     }
     
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
-        delegate?.didUserOffline(uid: uid)
+        delegate?.didPartnerLeave(uid: uid)
         print("User offline with uid: \(uid), reason: \(reason.rawValue)")
     }
     

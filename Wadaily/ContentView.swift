@@ -29,10 +29,12 @@ struct ContentView: View {
     
     private var mainContent: some View {
         TabView {
-            DiscoverView()
-                .tabItem {
-                    Label("Discover", systemImage: "globe")
-                }
+            if case .authenticated(let account) = authViewModel.authState {
+                DiscoverView(me: Caller.from(account))
+                    .tabItem {
+                        Label("Discover", systemImage: "globe")
+                    }
+            }
             AccountView()
                 .tabItem {
                     Label("Account", systemImage: "person")
@@ -44,24 +46,39 @@ struct ContentView: View {
 #Preview {
     // プレビュー用のモック実装
     class MockAuthRepository: AuthRepositoryProtocol {
-        func register(email: String, password: String, userId: String, iconImageData: Data?, backgroundImageData: Data?, profileText: String?) async throws -> User {
-            return User(id: "1", email: email, userId: userId, iconImageData: iconImageData, backgroundImageData: backgroundImageData, profileText: profileText)
+        func register(email: String, password: String, userId: String, iconImageData: Data?, backgroundImageData: Data?, profileText: String?) async throws -> Account {
+            return Account(
+                id: UUID(),
+                userId: userId,
+                name: "テストユーザー",
+                email: email,
+                intro: "テスト用の自己紹介",
+                iconUrl: "guest1",
+                backgroundUrl: "back1"
+            )
         }
         
-        func login(userId: String, password: String) async throws -> User {
-            return User(id: "1", email: "test@example.com", userId: userId)
+        func login(userId: String, password: String) async throws -> Account {
+            return Account(
+                id: UUID(),
+                userId: userId,
+                name: "テストユーザー",
+                email: "test@example.com",
+                intro: "テスト用の自己紹介",
+                iconUrl: "guest1",
+                backgroundUrl: "back1"
+            )
         }
         
         func logout() async throws {}
         
-        func getCurrentUser() async throws -> User? {
+        func getCurrentUser() async throws -> Account? {
             return nil
         }
     }
     
     let mockAuthRepo = MockAuthRepository()
-    let mockStorage = UserDefaultsStorage()
-    let viewModel = AuthViewModel(authRepository: mockAuthRepo, localStorage: mockStorage)
+    let viewModel = AuthViewModel(authRepository: mockAuthRepo)
     
     return ContentView(authViewModel: viewModel)
 }

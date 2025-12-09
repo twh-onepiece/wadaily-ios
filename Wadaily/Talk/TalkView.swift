@@ -8,10 +8,16 @@
 import SwiftUI
 
 struct TalkView: View {
-    @StateObject private var viewModel = TalkViewModel()
+    @StateObject private var viewModel: TalkViewModel
     @State private var pulseAnimation = false
-    let channelName: String
-    let partnerName: String
+    let me: Caller
+    let partner: Caller
+    
+    init(me: Caller, partner: Caller) {
+        self.me = me
+        self.partner = partner
+        _viewModel = StateObject(wrappedValue: TalkViewModel(me: me, partner: partner))
+    }
     
     private var stateText: String {
         switch viewModel.state {
@@ -59,7 +65,7 @@ struct TalkView: View {
                                 .opacity(pulseAnimation ? 0 : 0.5)
                         }
                         
-                        Image("guest1")
+                        Image(partner.imageUrl)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 150, height: 150)
@@ -72,7 +78,7 @@ struct TalkView: View {
                             .opacity(viewModel.state == .connecting || viewModel.state == .channelJoined ? 0.7 : 1.0)
                     }
                     
-                    Text(partnerName)
+                    Text(partner.name)
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
@@ -100,7 +106,7 @@ struct TalkView: View {
                 } else {
                     // 通話開始ボタン
                     Button(action: {
-                        viewModel.joinChannel(channelName: channelName)
+                        viewModel.joinChannel()
                     }) {
                         VStack(spacing: 8) {
                             Image(systemName: "phone.fill")
@@ -163,5 +169,5 @@ extension TalkView {
 }
 
 #Preview {
-    TalkView(channelName: "test", partnerName: "Sample User")
+    TalkView(me: DummyCallPartner.dummyMe, partner: DummyCallPartner.partners.last!)
 }

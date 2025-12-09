@@ -19,26 +19,26 @@ enum TalkViewState {
 class TalkViewModel: ObservableObject {
     @Published var state: TalkViewState = .disconnected
     @Published var isMuted: Bool = false
-    @Published var myUserId: UInt = 0
-    @Published var partnerUserId: UInt?
+    private let me: Caller
+    private let partner: Caller
     
     private var agoraManager: AgoraManager?
     private var coordinator: AgoraEngineCoordinator?
 
-    init() {
+    init(me: Caller, partner: Caller) {
+        self.me = me
+        self.partner = partner
         coordinator = AgoraEngineCoordinator(delegate: self)
         if let coordinator = coordinator {
             agoraManager = AgoraManager(delegate: coordinator)
         }
     }
     
-    func joinChannel(channelName: String, uid: UInt = 0) {
+    func joinChannel() {
         state = .connecting
-        myUserId = 0
-        partnerUserId = nil
         Task {
             do {
-                try await agoraManager?.joinChannel(channelName: channelName, uid: uid)
+                try await agoraManager?.joinChannel(channelName: partner.buildChannelName(with: me), uid: me.talkId)
             } catch {
                 state = .disconnected
                 print("Failed to join channel: \(error)")
@@ -61,35 +61,31 @@ class TalkViewModel: ObservableObject {
 }
 
 extension TalkViewModel: AgoraEngineCoordinatorDelegate {
-    func didMyUserJoined(uid: UInt) {
-        myUserId = uid
+    func didJoined(uid: UInt) {
+        guard (uid == me.talkId) else { return }
         state = .channelJoined
         print("I joined with uid: \(uid)")
     }
     
     func didPartnerJoined(uid: UInt) {
-        partnerUserId = uid
+        guard (uid == partner.talkId) else { return }
         state = .talking
         print("Partner joined with uid: \(uid)")
     }
     
-    func didUserOffline(uid: UInt) {
-        partnerUserId = nil
+    func didPartnerLeave(uid: UInt) {
+        guard (uid == partner.talkId) else { return }
         state = .callEnded
-        print("Partner joined with ui: \(uid)")
+        print("Partner lefted with uid: \(uid)")
     }
     
     func didLeaveChannel() {
         state = .callEnded
-        myUserId = 0
-        partnerUserId = nil
         print("Left channel")
     }
     
     func didOccurError() {
         state = .disconnected
-        myUserId = 0
-        partnerUserId = nil
         print("Error occurred")
     }
 }

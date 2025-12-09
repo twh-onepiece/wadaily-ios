@@ -6,5 +6,5 @@
 //
 
 protocol CallPartnerRepositoryProtocol {
-    func fetchCallPartners() async throws -> [CallPartner]
+    func fetchCallPartners() async throws -> [Caller]
 }
