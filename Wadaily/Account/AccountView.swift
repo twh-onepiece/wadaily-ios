@@ -9,10 +9,16 @@ import SwiftUI
 
 struct AccountView: View {
     // サンプルデータ
-    let me = DummyCallPartner.dummyMe
+    let me: Account
+    @ObservedObject var authViewModel: AuthViewModel
     
     // 通話履歴のサンプルデータ
     let callHistory = DummyCallHistory.histories
+    
+    init(me: Account, authViewModel: AuthViewModel) {
+        self.me = me
+        self.authViewModel = authViewModel
+    }
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -20,7 +26,7 @@ struct AccountView: View {
             ZStack {
                 // 背景画像
                 VStack {
-                    Image(me.backgroundImageUrl)
+                    Image(me.backgroundUrl)
                         .resizable()
                         .scaledToFill()
                         .frame(height: 160)
@@ -32,7 +38,7 @@ struct AccountView: View {
                 
                 VStack {
                     // アイコン
-                    Image(me.imageUrl)
+                    Image(me.iconUrl)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 120, height: 120)
@@ -87,6 +93,24 @@ struct AccountView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 6)
                         .background(.gray)
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: 8)
+                        )
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    Task {
+                        await authViewModel.logout()
+                    }
+                }) {
+                    Text("Logout")
+                        .foregroundStyle(.white)
+                        .font(.callout)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 6)
+                        .background(.red)
                         .clipShape(
                             RoundedRectangle(cornerRadius: 8)
                         )
@@ -193,6 +217,6 @@ extension AccountView {
 }
 
 #Preview {
-    AccountView()
+    AccountView(me: DummyAccount.urassh, authViewModel: AuthViewModel(authRepository: MockAuthRepository()))
 }
 

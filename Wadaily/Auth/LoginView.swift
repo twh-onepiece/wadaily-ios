@@ -17,6 +17,7 @@ struct LoginView: View {
     @State private var userId = ""
     @State private var password = ""
     @State private var showRegistration = false
+    @State private var showDummyAccountSelect = false
     
     var body: some View {
         NavigationView {
@@ -72,6 +73,11 @@ struct LoginView: View {
                 }
                 .padding()
                 
+                Button("ダミーアカウントでログイン") {
+                    showDummyAccountSelect = true
+                }
+                .padding(.bottom)
+                
                     Spacer()
                 }
                 .padding()
@@ -79,6 +85,9 @@ struct LoginView: View {
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showRegistration) {
                 RegistrationView(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showDummyAccountSelect) {
+                DummyAccountSelectView(viewModel: viewModel)
             }
         }
     }

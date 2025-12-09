@@ -68,13 +68,11 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     }
     
     func didPartnerJoined(uid: UInt) {
-        guard (uid == partner.talkId) else { return }
         state = .talking
         print("Partner joined with uid: \(uid)")
     }
     
     func didPartnerLeave(uid: UInt) {
-        guard (uid == partner.talkId) else { return }
         state = .callEnded
         print("Partner lefted with uid: \(uid)")
     }

@@ -80,4 +80,10 @@ class AuthViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
+    
+    // ダミーアカウントでログイン
+    func loginWithDummyAccount(_ account: Account) {
+        accountManager.saveAccount(account)
+        authState = .authenticated(account)
+    }
 }

@@ -113,6 +113,24 @@ class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate {
     
     func rtcEngine(_ engine: AgoraRtcEngineKit, didOccurError errorCode: AgoraErrorCode) {
         delegate?.didOccurError()
-        print("Error occurred: \(errorCode.rawValue)")
+        
+        // エラーコードの詳細を表示
+        let errorDescription: String
+        switch errorCode.rawValue {
+        case 110:
+            errorDescription = "ERR_OPEN_CHANNEL_TIMEOUT (110): チャンネルへの接続がタイムアウトしました。ネットワーク接続を確認してください。"
+        case 101:
+            errorDescription = "ERR_INVALID_APP_ID (101): App IDが無効です。"
+        case 109:
+            errorDescription = "ERR_TOKEN_EXPIRED (109): トークンの有効期限が切れています。"
+        case 2:
+            errorDescription = "ERR_INVALID_ARGUMENT (2): 無効な引数が渡されました。"
+        case 17:
+            errorDescription = "ERR_NOT_INITIALIZED (17): SDKが初期化されていません。"
+        default:
+            errorDescription = "Unknown error"
+        }
+        
+        print("❌ Agora Error occurred: \(errorCode.rawValue) - \(errorDescription)")
     }
 }

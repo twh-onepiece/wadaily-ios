@@ -20,10 +20,12 @@ struct Caller: Identifiable, Equatable, Hashable {
         status == "online"
     }
     
-    // 通話用のUInt型ID（userIdのハッシュ値から生成）
+    // 通話用のUInt型ID（userIdのハッシュ値から32ビット符号付き整数の範囲内で生成）
     var talkId: UInt {
-        let hash = userId.hashValue
-        return UInt(abs(hash))
+        let hash = abs(userId.hashValue)
+        // Int32の最大値（2147483647）内に収める
+        let limitedHash = hash % Int(Int32.max)
+        return UInt(limitedHash)
     }
     
     static func == (lhs: Self, rhs: Self) -> Bool {
@@ -42,11 +44,12 @@ struct Caller: Identifiable, Equatable, Hashable {
 }
 
 enum DummyCallPartner {
-    static let dummyMe = Caller(userId: "urassh", name: "うらっしゅ", imageUrl: "guest1", backgroundImageUrl: "back1", status: "online")
+    static let previewMe = Caller(userId: "urassh", name: "うらっしゅ", imageUrl: "guest1", backgroundImageUrl: "back1", status: "online")
     
     static let partners = [
-        Caller(userId: "sui", name: "Sui", imageUrl: "guest2", backgroundImageUrl: "back1", status: "online"),
-        Caller(userId: "tsukasa", name: "Tsukasa", imageUrl: "guest1", backgroundImageUrl: "back2", status: "offline"),
-        Caller(userId: "toku", name: "toku", imageUrl: "guest2", backgroundImageUrl: "back3", status: "online"),
+        Caller(userId: "urassh", name: "うらっしゅ", imageUrl: "guest1", backgroundImageUrl: "back1", status: "online"),
+        Caller(userId: "sui", name: "Sui", imageUrl: "guest2", backgroundImageUrl: "back2", status: "online"),
+        Caller(userId: "tsukasa", name: "Tsukasa", imageUrl: "guest3", backgroundImageUrl: "back3", status: "offline"),
+        Caller(userId: "cstoku", name: "toku", imageUrl: "guest4", backgroundImageUrl: "back4", status: "online"),
     ]
 }

@@ -34,11 +34,11 @@ struct ContentView: View {
                     .tabItem {
                         Label("Discover", systemImage: "globe")
                     }
+                AccountView(me: account, authViewModel: authViewModel)
+                    .tabItem {
+                        Label("Account", systemImage: "person")
+                    }
             }
-            AccountView()
-                .tabItem {
-                    Label("Account", systemImage: "person")
-                }
         }
     }
 }

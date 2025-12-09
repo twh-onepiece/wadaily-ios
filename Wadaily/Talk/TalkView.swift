@@ -169,5 +169,5 @@ extension TalkView {
 }
 
 #Preview {
-    TalkView(me: DummyCallPartner.dummyMe, partner: DummyCallPartner.partners.last!)
+    TalkView(me: DummyCallPartner.previewMe, partner: DummyCallPartner.partners.last!)
 }

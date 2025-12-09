@@ -15,7 +15,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		101677F32EE8014B00CBE81F /* Exceptions for "Wadaily" folder in "Wadaily" target */ = {
+		101678602EE810BE00CBE81F /* Exceptions for "Wadaily" folder in "Wadaily" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -28,7 +28,7 @@
 		10799A162ED88C1D00CEC295 /* Wadaily */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				101677F32EE8014B00CBE81F /* Exceptions for "Wadaily" folder in "Wadaily" target */,
+				101678602EE810BE00CBE81F /* Exceptions for "Wadaily" folder in "Wadaily" target */,
 			);
 			path = Wadaily;
 			sourceTree = "<group>";
@@ -278,14 +278,15 @@
 				DEVELOPMENT_TEAM = NJ55RU4U3A;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Wadaily/Info.plist;
 				INFOPLIST_KEY_AgoraAppId = 42b8ca513e0a4a5296790ad6ab8c2629;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "通話にマイクを使用します。";
-				INFOPLIST_KEY_WadailyAPI = "https://wadaily-backend-1011560404154.asia-northeast1.run.app";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_WadailyAPI = "https://wadaily-backend-1011560404154.asia-northeast1.run.app";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -313,14 +314,15 @@
 				DEVELOPMENT_TEAM = NJ55RU4U3A;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Wadaily/Info.plist;
 				INFOPLIST_KEY_AgoraAppId = 42b8ca513e0a4a5296790ad6ab8c2629;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "通話にマイクを使用します。";
-				INFOPLIST_KEY_WadailyAPI = "https://wadaily-backend-1011560404154.asia-northeast1.run.app";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_WadailyAPI = "https://wadaily-backend-1011560404154.asia-northeast1.run.app";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

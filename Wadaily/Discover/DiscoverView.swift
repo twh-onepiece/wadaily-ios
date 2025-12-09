@@ -8,10 +8,14 @@
 import SwiftUI
 
 struct DiscoverView: View {
+    @StateObject private var viewModel: DiscoverViewModel
     @State private var selectedPartner: Caller?
     let me: Caller
     
-    let partners = DummyCallPartner.partners
+    init(me: Caller) {
+        self.me = me
+        _viewModel = StateObject(wrappedValue: DiscoverViewModel(me: me))
+    }
     
     var body: some View {
         NavigationStack {
@@ -24,11 +28,20 @@ struct DiscoverView: View {
                     Text("話し相手をみつけよう")
                         .font(.callout)
                     
-                    ScrollView {
-                        ForEach(partners) { partner in
-                            CallPartnerCell(partner: partner)
-                                .shadow(radius: 5)
-                                .padding(8)
+                    if viewModel.isLoading {
+                        ProgressView("読み込み中...")
+                            .padding()
+                    } else if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .padding()
+                    } else {
+                        ScrollView {
+                            ForEach(viewModel.partners) { partner in
+                                CallPartnerCell(partner: partner)
+                                    .shadow(radius: 5)
+                                    .padding(8)
+                            }
                         }
                     }
                 }
@@ -36,6 +49,9 @@ struct DiscoverView: View {
             }
             .navigationDestination(item: $selectedPartner) { partner in
                 TalkView(me: me, partner: partner)
+            }
+            .task {
+                await viewModel.fetchPartners()
             }
         }
     }
@@ -113,5 +129,5 @@ extension DiscoverView {
 }
 
 #Preview {
-    DiscoverView(me: DummyCallPartner.dummyMe)
+    DiscoverView(me: DummyCallPartner.previewMe)
 }
