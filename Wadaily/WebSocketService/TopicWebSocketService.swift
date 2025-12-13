@@ -51,6 +51,8 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
             throw TopicServiceError.notConnected
         }
         
+        print("🚀: Sending Message \(messages)")
+        
         let request = WebSocketConversationsRequest(conversations: messages)
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase

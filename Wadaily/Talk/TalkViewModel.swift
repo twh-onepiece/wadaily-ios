@@ -327,6 +327,7 @@ extension TalkViewModel {
     /// WebSocketから話題提案を受け取るコールバック関数
     private func onReceivedTopics(_ topics: [String]) {
         Task { @MainActor in
+            print("==================SUCCESS=======================")
             print("💡 Received topics: \(topics)")
             suggestedTopics = topics
         }
