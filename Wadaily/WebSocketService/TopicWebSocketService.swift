@@ -65,6 +65,11 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let data = try encoder.encode(request)
         
+        // デバッグ: 送信するJSONを出力
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("📤 Sending JSON: \(jsonString)")
+        }
+        
         let message = URLSessionWebSocketTask.Message.data(data)
         
         do {
@@ -194,6 +199,11 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         
+        // デバッグ: 受信したJSONを出力
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("📩 Received JSON: \(jsonString)")
+        }
+        
         // まずエラーレスポンスかチェック
         if let errorResponse = try? decoder.decode(WebSocketErrorResponse.self, from: data) {
             print("❌ Server error: \(errorResponse.error)")
@@ -201,12 +211,27 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         }
         
         // 通常のレスポンスをデコード
-        if let response = try? decoder.decode(WebSocketTopicResponse.self, from: data) {
+        do {
+            let response = try decoder.decode(WebSocketTopicResponse.self, from: data)
             let topics = response.suggestions.map { $0.text }
             print("📥 Received \(topics.count) topics: \(topics)")
             callback?(topics)
-        } else {
-            print("⚠️ Failed to decode response")
+        } catch {
+            print("⚠️ Failed to decode response: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("❌ Key '\(key)' not found: \(context.debugDescription)")
+                case .typeMismatch(let type, let context):
+                    print("❌ Type mismatch for type \(type): \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("❌ Value not found for type \(type): \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    print("❌ Data corrupted: \(context.debugDescription)")
+                @unknown default:
+                    print("❌ Unknown decoding error")
+                }
+            }
         }
     }
     
