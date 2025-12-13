@@ -102,12 +102,15 @@ class TalkViewModel: ObservableObject {
     }
 
     func leaveChannel() {
+        // まずAgoraチャンネルから離脱
+        agoraManager?.leaveChannel()
+        
+        // その後、WebSocketセッションをクリーンアップ
         Task {
             await partnerSpeechToTextService.endSession()
             await mySpeechToTextService.endSession()
             await topicWebSocketService.endSession()
         }
-        agoraManager?.leaveChannel()
     }
     
     func toggleMute() {
@@ -160,10 +163,12 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
         let byteCount = Int(frame.samplesPerChannel * frame.channels * 2)
         let pcmData = Data(bytes: buffer, count: byteCount)
         
-        // テキスト変換サービスに直接送信
-        Task {
+        // テキスト変換サービスに直接送信（非同期・待たない）
+        // Agoraのオーディオスレッドをブロックしないため、detachedタスクで実行
+        Task.detached { [weak self] in
+            guard let self = self else { return }
             do {
-                try await mySpeechToTextService.sendAudioData(pcmData)
+                try await self.mySpeechToTextService.sendAudioData(pcmData)
                 print("📤 Sent My PCM data to service - Size: \(pcmData.count) bytes")
             } catch {
                 print("❌ Failed to send my audio data: \(error)")
@@ -178,31 +183,12 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     
     //MARK: - Event from partner
     func didPartnerJoined(uid: UInt) {
-        setupWebSoketSessions()
         state = .talking
         print("Partner joined with uid: \(uid)")
-
-        Task {
-            do {
-                // 相手の音声用セッション開始
-                try await partnerSpeechToTextService.startSession(
-                    sampleRate: SAMPLING_RATE,
-                    channels: 1,
-                    callback: onReceivedPartnerText
-                )
-                print("🎤 Partner Speech-to-Text session started")
-                
-                // 自分の音声用セッション開始
-                try await mySpeechToTextService.startSession(
-                    sampleRate: SAMPLING_RATE,
-                    channels: 1,
-                    callback: onReceivedMyText
-                )
-                print("🎤 My Speech-to-Text session started")
-            } catch {
-                print("❌ Failed to start speech-to-text sessions: \(error)")
-            }
-        }
+        
+        // WebSocketセッションを非同期で開始（待たない）
+        // 音声処理をブロックしないため、バックグラウンドで実行
+        setupWebSoketSessions()
     }
     
     func didPartnerLeave(uid: UInt) {
@@ -218,10 +204,12 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
         let byteCount = Int(frame.samplesPerChannel * frame.channels * 2)
         let pcmData = Data(bytes: buffer, count: byteCount)
         
-        // テキスト変換サービスに直接送信
-        Task {
+        // テキスト変換サービスに直接送信（非同期・待たない）
+        // Agoraのオーディオスレッドをブロックしないため、detachedタスクで実行
+        Task.detached { [weak self] in
+            guard let self = self else { return }
             do {
-                try await partnerSpeechToTextService.sendAudioData(pcmData)
+                try await self.partnerSpeechToTextService.sendAudioData(pcmData)
                 print("📤 Sent Partner PCM data to service - Size: \(pcmData.count) bytes")
             } catch {
                 print("❌ Failed to send partner audio data: \(error)")

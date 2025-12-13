@@ -20,6 +20,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				WebSocketService/Untitled.swift,
 			);
 			target = 10799A132ED88C1D00CEC295 /* Wadaily */;
 		};
