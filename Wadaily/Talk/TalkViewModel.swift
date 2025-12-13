@@ -41,6 +41,10 @@ class TalkViewModel: ObservableObject {
     private let mySpeechToTextService: SpeechToTextServiceProtocol      // 自分用のSpeech-to-Textサービス
     private let topicWebSocketService: TopicWebSocketServiceProtocol    // 話題提案用のWebSocketサービス
     private var lastPushedMessageCount = 0
+    
+    // WebSocket接続状態フラグ
+    private var isMySttConnected = false
+    private var isPartnerSttConnected = false
 
     init(
         me: Caller,
@@ -76,6 +80,7 @@ class TalkViewModel: ObservableObject {
                     channels: 1,
                     callback: onReceivedMyText
                 )
+                isMySttConnected = true
                 print("✅ [TalkViewModel] My Speech-to-Text session started")
 
                 // 相手の音声用セッション開始
@@ -85,6 +90,7 @@ class TalkViewModel: ObservableObject {
                     channels: 1,
                     callback: onReceivedPartnerText
                 )
+                isPartnerSttConnected = true
                 print("✅ [TalkViewModel] Partner Speech-to-Text session started")
                 
                 // 話題提案API用セッション開始
@@ -112,6 +118,10 @@ class TalkViewModel: ObservableObject {
     func leaveChannel() {
         // まずAgoraチャンネルから離脱
         agoraManager?.leaveChannel()
+        
+        // 接続フラグをリセット
+        isMySttConnected = false
+        isPartnerSttConnected = false
         
         // バッファをクリア
         bufferQueue.async { [weak self] in
@@ -192,14 +202,19 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
                 let dataToSend = self.myAudioBuffer
                 self.myAudioBuffer.removeAll(keepingCapacity: true)
                 
-                // STT APIに送信（非同期・待たない）
-                Task.detached {
-                    do {
-                        try await self.mySpeechToTextService.sendAudioData(dataToSend)
-                        print("📤 Sent My buffered PCM data to STT API - Size: \(dataToSend.count) bytes (\(self.STT_BUFFER_DURATION_MS)ms)")
-                    } catch {
-                        print("❌ Failed to send my audio data: \(error)")
+                // WebSocket接続が確立されている場合のみ送信
+                if self.isMySttConnected {
+                    // STT APIに送信（非同期・待たない）
+                    Task.detached {
+                        do {
+                            try await self.mySpeechToTextService.sendAudioData(dataToSend)
+                            print("📤 Sent My buffered PCM data to STT API - Size: \(dataToSend.count) bytes (\(self.STT_BUFFER_DURATION_MS)ms)")
+                        } catch {
+                            print("❌ Failed to send my audio data: \(error)")
+                        }
                     }
+                } else {
+                    print("⏸️ My STT not connected yet, discarding \(dataToSend.count) bytes")
                 }
             }
         }
@@ -247,14 +262,19 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
                 let dataToSend = self.partnerAudioBuffer
                 self.partnerAudioBuffer.removeAll(keepingCapacity: true)
                 
-                // STT APIに送信（非同期・待たない）
-                Task.detached {
-                    do {
-                        try await self.partnerSpeechToTextService.sendAudioData(dataToSend)
-                        print("📤 Sent Partner buffered PCM data to STT API - Size: \(dataToSend.count) bytes (\(self.STT_BUFFER_DURATION_MS)ms)")
-                    } catch {
-                        print("❌ Failed to send partner audio data: \(error)")
+                // WebSocket接続が確立されている場合のみ送信
+                if self.isPartnerSttConnected {
+                    // STT APIに送信（非同期・待たない）
+                    Task.detached {
+                        do {
+                            try await self.partnerSpeechToTextService.sendAudioData(dataToSend)
+                            print("📤 Sent Partner buffered PCM data to STT API - Size: \(dataToSend.count) bytes (\(self.STT_BUFFER_DURATION_MS)ms)")
+                        } catch {
+                            print("❌ Failed to send partner audio data: \(error)")
+                        }
                     }
+                } else {
+                    print("⏸️ Partner STT not connected yet, discarding \(dataToSend.count) bytes")
                 }
             }
         }
