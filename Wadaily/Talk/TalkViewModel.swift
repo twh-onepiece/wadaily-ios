@@ -150,7 +150,6 @@ class TalkViewModel: ObservableObject {
     private func checkAndPushMessages() {
         guard currentConversation.count >= MESSAGE_THRESHOLD else { return }
         
-        let pushId = UUID().uuidString.prefix(8)
         let toPushMessages = currentConversation
         currentConversation = []
         
@@ -181,8 +180,6 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     }
     
     func didReceiveMyAudioFrame(_ frame: AgoraAudioFrame) {
-        let frameId = UUID().uuidString.prefix(8)
-        
         // 自分のPCMデータを処理
         guard let buffer = frame.buffer else { return }
         

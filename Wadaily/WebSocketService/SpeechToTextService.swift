@@ -51,9 +51,10 @@ class SpeechToTextService: SpeechToTextServiceProtocol {
         }
 
         do {
-            try await webSocketTask.send(.data(pcmData.base64EncodedData()))
+            try await webSocketTask.send(.data(pcmData))
         } catch {
             isConnected = false
+            print("error: can't send it")
             throw error
         }
     }
@@ -87,7 +88,6 @@ class SpeechToTextService: SpeechToTextServiceProtocol {
                 // 次のメッセージを受信
                 self.receiveMessage()
             case .failure(let error):
-                let nsError = error as NSError
                 self.isConnected = false
                 self.callback?(.failure(error))
             }
