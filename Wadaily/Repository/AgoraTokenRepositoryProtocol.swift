@@ -23,7 +23,7 @@ class AgoraTokenRepository: AgoraTokenRepositoryProtocol {
     private let baseURL: String
     
     init() {
-        self.baseURL = "https://wadaily-backend-1011560404154.asia-northeast1.run.app"
+        self.baseURL = "https://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp"
     }
     
     func getToken(
