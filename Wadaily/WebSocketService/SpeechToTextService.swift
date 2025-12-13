@@ -71,6 +71,7 @@ class SpeechToTextService: SpeechToTextServiceProtocol {
         guard let task = webSocketTask else { return }
                 
         task.receive { [weak self] result in
+            print("receive message with: \(result)")
             guard let self = self else { return }
 
             switch result {
