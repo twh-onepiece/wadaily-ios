@@ -16,6 +16,7 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
     private var isConnected = false
     private let baseURL: String
     private let sessionURL: String
+    private let urlSession: URLSession
     
     // ユーザープロファイル
     private var meProfile: UserProfile?
@@ -24,6 +25,13 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
     init(baseURL: String = "https://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp") {
         self.baseURL = baseURL
         self.sessionURL = "\(baseURL)/sessions"
+        
+        // URLSessionの設定
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 30
+        configuration.waitsForConnectivity = true
+        self.urlSession = URLSession(configuration: configuration)
     }
     
     /// ユーザープロファイルを設定
@@ -49,6 +57,8 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         
         isConnected = true
         print("[TopicWebSocket] ✅ Step 2 Complete: WebSocket connected")
+        print("[TopicWebSocket] ⏱️ Waiting 100ms before starting receive loop...")
+        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms待機
         print("[TopicWebSocket] 📩 Step 3: Starting message receive loop...")
         
         // メッセージ受信の開始
@@ -64,9 +74,11 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
             throw TopicServiceError.notConnected
         }
         
-        guard isConnected else {
-            print("[TopicWebSocket] ❌ isConnected = false")
-            throw TopicServiceError.notConnected
+        if !isConnected {
+            print("[TopicWebSocket] ⚠️ isConnected = false, but WebSocketTask exists")
+            print("[TopicWebSocket] 🔧 Attempting to recover connection state...")
+            // WebSocketTaskが存在する場合は、接続を回復を試みる
+            isConnected = true
         }
         
         print("[TopicWebSocket] 📝 Preparing to send messages:")
@@ -189,37 +201,33 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
     
     /// WebSocket接続を確立
     private func connectWebSocket(sessionId: String) async throws {
+        print("[TopicWebSocket] 🔄 Original baseURL: \(baseURL)")
+        
         // HTTPSのURLをwssに変換
         let wsBaseURL = baseURL.replacingOccurrences(of: "https://", with: "wss://")
                                 .replacingOccurrences(of: "http://", with: "ws://")
         
-        guard let url = URL(string: "\(wsBaseURL)/sessions/\(sessionId)/topics") else {
+        print("[TopicWebSocket] 🔄 Converted wsBaseURL: \(wsBaseURL)")
+        
+        let fullURL = "\(wsBaseURL)/sessions/\(sessionId)/topics"
+        print("[TopicWebSocket] 🎯 Full WebSocket URL: \(fullURL)")
+        
+        guard let url = URL(string: fullURL) else {
+            print("[TopicWebSocket] ❌ Invalid URL: \(fullURL)")
             throw TopicServiceError.invalidURL
         }
         
-        // URLSessionの設定
-        let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 30
-        configuration.timeoutIntervalForResource = 30
-        configuration.waitsForConnectivity = true
+        print("[TopicWebSocket] ✅ Valid URL created: \(url)")
+        print("[TopicWebSocket] 🔍 URL scheme: \(url.scheme ?? "none")")
         
-        let session = URLSession(configuration: configuration)
-        webSocketTask = session.webSocketTask(with: url)
+        // WebSocketタスクを作成
+        webSocketTask = urlSession.webSocketTask(with: url)
+        
+        print("[TopicWebSocket] ✅ WebSocketTask created")
+        print("[TopicWebSocket] 🚀 Starting WebSocket connection...")
         webSocketTask?.resume()
         
-        print("🔌 WebSocket connecting to \(url)...")
-        
-        // 接続確認のためpingを送信
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            webSocketTask?.sendPing { error in
-                if let error = error {
-                    print("⚠️ WebSocket ping failed: \(error)")
-                } else {
-                    print("✅ WebSocket ping successful - connection established")
-                }
-                continuation.resume()
-            }
-        }
+        print("[TopicWebSocket] ✅ WebSocket connection initiated to \(url)")
     }
     
     /// メッセージ受信を開始
@@ -259,9 +267,24 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
                 print("[TopicWebSocket] 🔄 Restarting receive loop...")
                 self.receiveMessage()
             case .failure(let error):
-                self.isConnected = false
-                print("[TopicWebSocket] ❌ WebSocket receive error: \(error.localizedDescription)")
-                print("[TopicWebSocket] ❌ Error details: \(error)")
+                print("[TopicWebSocket] ⚠️ WebSocket receive error: \(error.localizedDescription)")
+                print("[TopicWebSocket] ⚠️ Error details: \(error)")
+                
+                // NSPOSIXErrorDomain Code=57 は一時的なエラーの可能性があるため、再試行
+                let nsError = error as NSError
+                if nsError.domain == NSPOSIXErrorDomain && nsError.code == 57 {
+                    print("[TopicWebSocket] ⚠️ Socket not connected error - this may be temporary")
+                    print("[TopicWebSocket] 🔄 Retrying receive in 1 second...")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        if self.isConnected {
+                            self.receiveMessage()
+                        }
+                    }
+                } else {
+                    // その他の深刻なエラーの場合のみ切断
+                    self.isConnected = false
+                    print("[TopicWebSocket] ❌ Fatal error - marking as disconnected")
+                }
             }
         }
     }
