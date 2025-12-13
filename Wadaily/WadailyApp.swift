@@ -15,7 +15,6 @@ struct WadailyApp: App {
     
     init() {
         let authRepo = MockAuthRepository()
-        let storage = UserDefaultsStorage()
         _authViewModel = StateObject(wrappedValue: AuthViewModel(authRepository: authRepo))
     }
     
