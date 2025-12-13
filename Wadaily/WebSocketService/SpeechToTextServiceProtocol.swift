@@ -71,64 +71,92 @@ class MockSpeechToTextService: SpeechToTextServiceProtocol {
  class SpeechToTextService: SpeechToTextServiceProtocol {
      private var webSocketTask: URLSessionWebSocketTask?
      private var callback: SpeechToTextCallback?
+     private var sessionId: String = ""
     
      func startSession(
          sampleRate: Int,
          channels: Int,
          callback: @escaping SpeechToTextCallback
      ) async throws {
+         sessionId = UUID().uuidString.prefix(8).description
+         print("🔌 [STT-\(sessionId)] Starting session - SampleRate: \(sampleRate)Hz, Channels: \(channels)")
+         
          self.callback = callback
         
          // WebSocket接続の実装
-         // TODO: 実際のWebSocketエンドポイントURLを設定
          guard let url = URL(string: "wss://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp/transcript/connect") else {
+             print("❌ [STT-\(sessionId)] Invalid WebSocket URL")
              throw NSError(domain: "SpeechToTextService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
          }
         
+         print("🔌 [STT-\(sessionId)] Connecting to: \(url.absoluteString)")
          let session = URLSession(configuration: .default)
          webSocketTask = session.webSocketTask(with: url)
          webSocketTask?.resume()
         
+         print("✅ [STT-\(sessionId)] WebSocket connection initiated")
+         
          // メッセージ受信の開始
          receiveMessage()
      }
     
      func sendAudioData(_ pcmData: Data) async throws {
          guard let webSocketTask = webSocketTask else {
+             print("❌ [STT-\(sessionId)] Cannot send audio: WebSocket not connected")
              throw NSError(domain: "SpeechToTextService", code: 2, userInfo: [NSLocalizedDescriptionKey: "WebSocket not connected"])
          }
         
-         try await webSocketTask.send(.data(pcmData.base64EncodedData()))
+         print("📤 [STT-\(sessionId)] Sending PCM data: \(pcmData.count) bytes")
+         
+         // バグ修正: 生のバイナリデータを送信 (base64エンコードは不要)
+         try await webSocketTask.send(.data(pcmData))
+         
+         print("✅ [STT-\(sessionId)] PCM data sent successfully")
      }
     
      func endSession() async {
+         print("🔌 [STT-\(sessionId)] Ending session...")
          webSocketTask?.cancel(with: .goingAway, reason: nil)
          webSocketTask = nil
          callback = nil
+         print("✅ [STT-\(sessionId)] Session ended")
      }
     
      private func receiveMessage() {
          webSocketTask?.receive { [weak self] result in
+             guard let self = self else { return }
+             
              switch result {
              case .success(let message):
+                 print("📥 [STT-\(self.sessionId)] Received WebSocket message")
+                 
                  switch message {
                  case .string(let text):
+                     print("📝 [STT-\(self.sessionId)] Received text message: \(text)")
                      // テキストメッセージとして変換結果を受信
-                     self?.callback?(.success(text))
+                     self.callback?(.success(text))
+                     
                  case .data(let data):
+                     print("📝 [STT-\(self.sessionId)] Received data message: \(data.count) bytes")
                      // データとして受信した場合、UTF-8文字列に変換
                      if let text = String(data: data, encoding: .utf8) {
-                         self?.callback?(.success(text))
+                         print("📝 [STT-\(self.sessionId)] Decoded text: \(text)")
+                         self.callback?(.success(text))
+                     } else {
+                         print("❌ [STT-\(self.sessionId)] Failed to decode data as UTF-8")
                      }
+                     
                  @unknown default:
+                     print("⚠️ [STT-\(self.sessionId)] Received unknown message type")
                      break
                  }
                 
                  // 次のメッセージを受信
-                 self?.receiveMessage()
+                 self.receiveMessage()
                 
              case .failure(let error):
-                 self?.callback?(.failure(error))
+                 print("❌ [STT-\(self.sessionId)] WebSocket error: \(error.localizedDescription)")
+                 self.callback?(.failure(error))
              }
          }
      }

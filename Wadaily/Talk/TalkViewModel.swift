@@ -66,29 +66,33 @@ class TalkViewModel: ObservableObject {
     }
     
     private func setupWebSoketSessions() {
+        print("🔌 [TalkViewModel] Setting up WebSocket sessions...")
         Task {
             do {
                 // 自分の音声用セッション開始
+                print("🎤 [TalkViewModel] Starting My Speech-to-Text session...")
                 try await mySpeechToTextService.startSession(
                     sampleRate: SAMPLING_RATE,
                     channels: 1,
                     callback: onReceivedMyText
                 )
-                print("🎤 My Speech-to-Text session started")
+                print("✅ [TalkViewModel] My Speech-to-Text session started")
 
                 // 相手の音声用セッション開始
+                print("🎤 [TalkViewModel] Starting Partner Speech-to-Text session...")
                 try await partnerSpeechToTextService.startSession(
                     sampleRate: SAMPLING_RATE,
                     channels: 1,
                     callback: onReceivedPartnerText
                 )
-                print("🎤 Partner Speech-to-Text session started")
+                print("✅ [TalkViewModel] Partner Speech-to-Text session started")
                 
                 // 話題提案API用セッション開始
+                print("🔌 [TalkViewModel] Starting Topic WebSocket session...")
                 try await topicWebSocketService.startSession(callback: onReceivedTopics)
-                print("🔌 WebSocket session started for topic suggestions")
+                print("✅ [TalkViewModel] WebSocket session started for topic suggestions")
             } catch {
-                print("❌ Failed to start sessions: \(error)")
+                print("❌ [TalkViewModel] Failed to start sessions: \(error.localizedDescription)")
             }
         }
     }
@@ -262,41 +266,46 @@ extension TalkViewModel {
     /// 自分の音声からテキスト変換結果を受け取るコールバック関数
     private func onReceivedMyText(_ result: Result<String, Error>) {
         let textId = UUID().uuidString.prefix(8)
+        print("📥 [TalkViewModel-\(textId)] Callback invoked for MY text")
+        
         switch result {
         case .success(let text):
+            print("📝 [TalkViewModel-\(textId)] My recognized text: \(text)")
             Task { @MainActor in
-                print("📝 My recognized text: \(text)")
                 let message = ConversationMessage(
                     userId: me.talkId,
                     text: text,
                     timestamp: Date()
                 )
                 currentConversation.append(message)
+                print("💬 [TalkViewModel-\(textId)] Added to conversation. Total: \(currentConversation.count) messages")
                 checkAndPushMessages()
             }
         case .failure(let error):
-            print("❌ My speech to text conversion failed: \(error)")
+            print("❌ [TalkViewModel-\(textId)] My speech to text conversion failed: \(error.localizedDescription)")
         }
     }
     
     /// 相手の音声からテキスト変換結果を受け取るコールバック関数
     private func onReceivedPartnerText(_ result: Result<String, Error>) {
         let textId = UUID().uuidString.prefix(8)
+        print("📥 [TalkViewModel-\(textId)] Callback invoked for PARTNER text")
         
         switch result {
         case .success(let text):
+            print("📝 [TalkViewModel-\(textId)] Partner recognized text: \(text)")
             Task { @MainActor in
-                print("📝 Partner recognized text: \(text)")
                 let message = ConversationMessage(
                     userId: partner.talkId,
                     text: text,
                     timestamp: Date()
                 )
                 currentConversation.append(message)
+                print("💬 [TalkViewModel-\(textId)] Added to conversation. Total: \(currentConversation.count) messages")
                 checkAndPushMessages()
             }
         case .failure(let error):
-            print("❌ Partner speech to text conversion failed: \(error)")
+            print("❌ [TalkViewModel-\(textId)] Partner speech to text conversion failed: \(error.localizedDescription)")
         }
     }
     
