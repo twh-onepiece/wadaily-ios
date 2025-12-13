@@ -1,5 +1,5 @@
 //
-//  SpeechToTextRepositoryProtocol.swift
+//  SpeechToTextServiceProtocol.swift
 //  Wadaily
 //
 //  Created by 浦山秀斗 on 2025/12/13.
@@ -11,7 +11,7 @@ import Foundation
 typealias SpeechToTextCallback = (Result<String, Error>) -> Void
 
 /// 音声テキスト変換サービスのプロトコル
-protocol SpeechToTextRepositoryProtocol {
+protocol SpeechToTextServiceProtocol {
     /// WebSocket接続を開始し、変換結果を受け取るコールバックを設定
     /// - Parameters:
     ///   - sampleRate: サンプルレート (例: 24000)
@@ -32,7 +32,7 @@ protocol SpeechToTextRepositoryProtocol {
 }
 
 /// デフォルトの実装（モック用）
-class MockSpeechToTextService: SpeechToTextRepositoryProtocol {
+class MockSpeechToTextService: SpeechToTextServiceProtocol {
     private var callback: SpeechToTextCallback?
     private var isSessionActive = false
     
@@ -68,7 +68,7 @@ class MockSpeechToTextService: SpeechToTextRepositoryProtocol {
     }
 }
 
-// class SpeechToTextService: SpeechToTextRepositoryProtocol {
+// class SpeechToTextService: SpeechToTextServiceProtocol {
 //     private var webSocketTask: URLSessionWebSocketTask?
 //     private var callback: SpeechToTextCallback?
     

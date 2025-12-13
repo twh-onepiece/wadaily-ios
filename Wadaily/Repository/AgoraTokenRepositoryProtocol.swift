@@ -26,8 +26,6 @@ class AgoraTokenRepository: AgoraTokenRepositoryProtocol {
         self.baseURL = "https://wadaily-backend-1011560404154.asia-northeast1.run.app"
     }
     
-   
-    
     func getToken(
         channelName: String,
         uid: UInt,

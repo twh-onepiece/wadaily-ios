@@ -1,15 +1,16 @@
 //
-//  TopicWebSocketRepositoryProtocol.swift
+//  TopicServiceProtocol.swift
 //  Wadaily
 //
-//  Created on 2025/12/13.
+//  Created by 浦山秀斗 on 2025/12/13.
 //
 
 import Foundation
 
+// 話題を受け取るコールバック
 typealias TopicReceivedCallback = ([String]) -> Void
 
-protocol TopicWebSocketRepositoryProtocol {
+protocol TopicWebSocketServiceProtocol {
     /// WebSocketセッションを開始
     func startSession(callback: @escaping TopicReceivedCallback) async throws
     
@@ -22,7 +23,7 @@ protocol TopicWebSocketRepositoryProtocol {
 
 // MARK: - Mock Implementation
 
-class MockTopicWebSocketService: TopicWebSocketRepositoryProtocol {
+class MockTopicWebSocketService: TopicWebSocketServiceProtocol {
     private var callback: TopicReceivedCallback?
     
     func startSession(callback: @escaping TopicReceivedCallback) async throws {

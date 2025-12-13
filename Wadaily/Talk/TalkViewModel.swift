@@ -38,17 +38,17 @@ class TalkViewModel: ObservableObject {
     
     private var agoraManager: AgoraManager?
     private var coordinator: AgoraEngineCoordinator?
-    private let partnerSpeechToTextService: SpeechToTextRepositoryProtocol // 相手用のSpeech-to-Textサービス
-    private let mySpeechToTextService: SpeechToTextRepositoryProtocol      // 自分用のSpeech-to-Textサービス
-    private let topicWebSocketService: TopicWebSocketRepositoryProtocol    // 話題提案用のWebSocketサービス
+    private let partnerSpeechToTextService: SpeechToTextServiceProtocol // 相手用のSpeech-to-Textサービス
+    private let mySpeechToTextService: SpeechToTextServiceProtocol      // 自分用のSpeech-to-Textサービス
+    private let topicWebSocketService: TopicWebSocketServiceProtocol    // 話題提案用のWebSocketサービス
     private var lastPushedMessageCount = 0
 
     init(
         me: Caller,
         partner: Caller,
-        partnerSpeechToTextService: SpeechToTextRepositoryProtocol = MockSpeechToTextService(),
-        mySpeechToTextService: SpeechToTextRepositoryProtocol = MockSpeechToTextService(),
-        topicWebSocketService: TopicWebSocketRepositoryProtocol = MockTopicWebSocketService()
+        partnerSpeechToTextService: SpeechToTextServiceProtocol = MockSpeechToTextService(),
+        mySpeechToTextService: SpeechToTextServiceProtocol = MockSpeechToTextService(),
+        topicWebSocketService: TopicWebSocketServiceProtocol = MockTopicWebSocketService()
     ) {
         self.me = me
         self.partner = partner
