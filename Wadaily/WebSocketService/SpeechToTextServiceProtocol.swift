@@ -68,74 +68,68 @@ class MockSpeechToTextService: SpeechToTextServiceProtocol {
     }
 }
 
-// class SpeechToTextService: SpeechToTextServiceProtocol {
-//     private var webSocketTask: URLSessionWebSocketTask?
-//     private var callback: SpeechToTextCallback?
+ class SpeechToTextService: SpeechToTextServiceProtocol {
+     private var webSocketTask: URLSessionWebSocketTask?
+     private var callback: SpeechToTextCallback?
     
-//     func startSession(
-//         sampleRate: Int,
-//         channels: Int,
-//         callback: @escaping SpeechToTextCallback
-//     ) async throws {
-//         self.callback = callback
+     func startSession(
+         sampleRate: Int,
+         channels: Int,
+         callback: @escaping SpeechToTextCallback
+     ) async throws {
+         self.callback = callback
         
-//         // WebSocket接続の実装
-//         // TODO: 実際のWebSocketエンドポイントURLを設定
-//         guard let url = URL(string: "wss://your-api-endpoint.com/speech-to-text") else {
-//             throw NSError(domain: "SpeechToTextService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
-//         }
+         // WebSocket接続の実装
+         // TODO: 実際のWebSocketエンドポイントURLを設定
+         guard let url = URL(string: "wss://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp/transcript/connect") else {
+             throw NSError(domain: "SpeechToTextService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+         }
         
-//         let session = URLSession(configuration: .default)
-//         webSocketTask = session.webSocketTask(with: url)
-//         webSocketTask?.resume()
+         let session = URLSession(configuration: .default)
+         webSocketTask = session.webSocketTask(with: url)
+         webSocketTask?.resume()
         
-//         // メッセージ受信の開始
-//         receiveMessage()
-        
-//         // 初期化メッセージの送信 (必要に応じて)
-//         let config = ["sampleRate": sampleRate, "channels": channels]
-//         if let configData = try? JSONSerialization.data(withJSONObject: config) {
-//             try await webSocketTask?.send(.data(configData))
-//         }
-//     }
+         // メッセージ受信の開始
+         receiveMessage()
+     }
     
-//     func sendAudioData(_ pcmData: Data) async throws {
-//         guard let webSocketTask = webSocketTask else {
-//             throw NSError(domain: "SpeechToTextService", code: 2, userInfo: [NSLocalizedDescriptionKey: "WebSocket not connected"])
-//         }
+     func sendAudioData(_ pcmData: Data) async throws {
+         guard let webSocketTask = webSocketTask else {
+             throw NSError(domain: "SpeechToTextService", code: 2, userInfo: [NSLocalizedDescriptionKey: "WebSocket not connected"])
+         }
         
-//         try await webSocketTask.send(.data(pcmData))
-//     }
+         try await webSocketTask.send(.data(pcmData.base64EncodedData()))
+     }
     
-//     func endSession() async {
-//         webSocketTask?.cancel(with: .goingAway, reason: nil)
-//         webSocketTask = nil
-//         callback = nil
-//     }
+     func endSession() async {
+         webSocketTask?.cancel(with: .goingAway, reason: nil)
+         webSocketTask = nil
+         callback = nil
+     }
     
-//     private func receiveMessage() {
-//         webSocketTask?.receive { [weak self] result in
-//             switch result {
-//             case .success(let message):
-//                 switch message {
-//                 case .string(let text):
-//                     // テキストメッセージとして変換結果を受信
-//                     self?.callback?(.success(text))
-//                 case .data(let data):
-//                     // データとして受信した場合、UTF-8文字列に変換
-//                     if let text = String(data: data, encoding: .utf8) {
-//                         self?.callback?(.success(text))
-//                     }
-//                 @unknown default:
-//                     break
-//                 }
+     private func receiveMessage() {
+         webSocketTask?.receive { [weak self] result in
+             switch result {
+             case .success(let message):
+                 switch message {
+                 case .string(let text):
+                     // テキストメッセージとして変換結果を受信
+                     self?.callback?(.success(text))
+                 case .data(let data):
+                     // データとして受信した場合、UTF-8文字列に変換
+                     if let text = String(data: data, encoding: .utf8) {
+                         self?.callback?(.success(text))
+                     }
+                 @unknown default:
+                     break
+                 }
                 
-//                 // 次のメッセージを受信
-//                 self?.receiveMessage()
+                 // 次のメッセージを受信
+                 self?.receiveMessage()
                 
-//             case .failure(let error):
-//                 self?.callback?(.failure(error))
-//             }
-//         }
-//     }
-// }
+             case .failure(let error):
+                 self?.callback?(.failure(error))
+             }
+         }
+     }
+ }

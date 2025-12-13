@@ -45,8 +45,8 @@ class TalkViewModel: ObservableObject {
     init(
         me: Caller,
         partner: Caller,
-        partnerSpeechToTextService: SpeechToTextServiceProtocol = MockSpeechToTextService(),
-        mySpeechToTextService: SpeechToTextServiceProtocol = MockSpeechToTextService(),
+        partnerSpeechToTextService: SpeechToTextServiceProtocol = SpeechToTextService(),
+        mySpeechToTextService: SpeechToTextServiceProtocol = SpeechToTextService(),
         topicWebSocketService: TopicWebSocketServiceProtocol = MockTopicWebSocketService()
     ) {
         self.me = me
