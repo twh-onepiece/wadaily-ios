@@ -19,6 +19,13 @@ struct TalkView: View {
         _viewModel = StateObject(wrappedValue: TalkViewModel(me: me, partner: partner))
     }
     
+    // テスト用：ViewModelを外部から注入
+    init(me: Caller, partner: Caller, viewModel: TalkViewModel) {
+        self.me = me
+        self.partner = partner
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+    
     private var stateText: String {
         switch viewModel.state {
         case .disconnected:
@@ -45,6 +52,8 @@ struct TalkView: View {
             .ignoresSafeArea()
             
             VStack(spacing: 40) {
+                Spacer()
+                Spacer()
                 Spacer()
                 
                 // 相手のアイコン
@@ -99,10 +108,21 @@ struct TalkView: View {
                 
                 Spacer()
                 
+                // 話題提案（常に表示エリアを確保）
+                if !viewModel.suggestedTopics.isEmpty {
+                    TopicSuggestionView(
+                        topics: viewModel.suggestedTopics
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                
+                Spacer()
+                    .frame(minHeight: 40)
+                
                 // コントロールボタン
                 if viewModel.state == .talking {
                     talkingButtons
-                        .padding(.bottom, 50)
+                        .padding(.bottom, 20)
                 } else {
                     // 通話開始ボタン
                     Button(action: {
@@ -117,10 +137,8 @@ struct TalkView: View {
                                 .clipShape(Circle())
                         }
                     }
-                    .padding(.bottom, 50)
+                    .padding(.bottom, 20)
                 }
-                
-                Spacer()
             }
         }
     }
@@ -170,4 +188,22 @@ extension TalkView {
 
 #Preview {
     TalkView(me: DummyCallPartner.previewMe, partner: DummyCallPartner.partners.last!)
+}
+
+#Preview("With Topics") {
+    let view = TalkView(me: DummyCallPartner.previewMe, partner: DummyCallPartner.partners.last!)
+    
+    // ビューが表示された後に話題を設定
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        if let viewModel = Mirror(reflecting: view).children.first(where: { $0.label == "_viewModel" })?.value as? StateObject<TalkViewModel> {
+            viewModel.wrappedValue.setTestTopics([
+                "🎬 最近見た映画は？",
+                "🍕 好きな食べ物",
+                "🌍 行ってみたい旅行先",
+                "⚽️ 趣味について"
+            ])
+        }
+    }
+    
+    return view
 }
