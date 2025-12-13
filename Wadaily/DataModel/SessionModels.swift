@@ -19,11 +19,4 @@ struct CreateSessionResponse: Codable {
     let status: String
     let commonInterests: [String]
     let initialSuggestions: [TopicSuggestion]
-    
-    enum CodingKeys: String, CodingKey {
-        case sessionId = "session_id"
-        case status
-        case commonInterests = "common_interests"
-        case initialSuggestions = "initial_suggestions"
-    }
 }

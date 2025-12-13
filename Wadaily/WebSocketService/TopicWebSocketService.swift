@@ -34,31 +34,45 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
     
     // MARK: - Public Methods
     func startSession(callback: @escaping TopicReceivedCallback) async throws {
+        print("[TopicWebSocket] 🚀 Starting session...")
         self.callback = callback
         
         // まずHTTP APIでセッションを作成
+        print("[TopicWebSocket] 📡 Step 1: Creating session via HTTPS...")
         let sessionId = try await createSession()
         self.sessionId = sessionId
+        print("[TopicWebSocket] ✅ Step 1 Complete: Session ID = \(sessionId)")
         
-        // WebSocket接続を確立
+        // WebSocket接続を確立（ping送信で接続確認済み）
+        print("[TopicWebSocket] 🔌 Step 2: Establishing WebSocket connection...")
         try await connectWebSocket(sessionId: sessionId)
         
         isConnected = true
+        print("[TopicWebSocket] ✅ Step 2 Complete: WebSocket connected")
+        print("[TopicWebSocket] 📩 Step 3: Starting message receive loop...")
         
-        // メッセージ受信の開始（接続確立後すぐに）
+        // メッセージ受信の開始
         receiveMessage()
+        print("[TopicWebSocket] ✅ All steps complete - Session ready!")
     }
     
     func pushMessages(_ messages: [ConversationMessage]) async throws {
+        print("[TopicWebSocket] 📤 pushMessages called with \(messages.count) messages")
+        
         guard let webSocketTask = webSocketTask else {
+            print("[TopicWebSocket] ❌ WebSocketTask is nil")
             throw TopicServiceError.notConnected
         }
         
         guard isConnected else {
+            print("[TopicWebSocket] ❌ isConnected = false")
             throw TopicServiceError.notConnected
         }
         
-        print("🚀: Sending Message \(messages)")
+        print("[TopicWebSocket] 📝 Preparing to send messages:")
+        for (index, msg) in messages.enumerated() {
+            print("[TopicWebSocket]   [\(index)] userId=\(msg.userId), text=\(msg.text)")
+        }
         
         let request = WebSocketConversationsRequest(conversations: messages)
         let encoder = JSONEncoder()
@@ -67,35 +81,40 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         
         // デバッグ: 送信するJSONを出力
         if let jsonString = String(data: data, encoding: .utf8) {
-            print("📤 Sending JSON: \(jsonString)")
+            print("[TopicWebSocket] 📤 Sending JSON (\(data.count) bytes):")
+            print("[TopicWebSocket] \(jsonString)")
         }
         
         let message = URLSessionWebSocketTask.Message.data(data)
         
         do {
+            print("[TopicWebSocket] 🚀 Sending message via WebSocket...")
             try await webSocketTask.send(message)
-            print("📤 Sent \(messages.count) messages to server")
+            print("[TopicWebSocket] ✅ Successfully sent \(messages.count) messages to server")
         } catch {
             isConnected = false
-            print("❌ Failed to send messages")
+            print("[TopicWebSocket] ❌ Failed to send messages: \(error.localizedDescription)")
             throw error
         }
     }
     
     func endSession() async {
+        print("[TopicWebSocket] 🛑 Ending session...")
         isConnected = false
         // WebSocket接続を切断
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
+        print("[TopicWebSocket] 🔌 WebSocket connection closed")
         
         // セッション削除（オプション）
         if let sessionId = sessionId {
+            print("[TopicWebSocket] 🗑️ Deleting session: \(sessionId)")
             await deleteSession(sessionId: sessionId)
         }
         
         sessionId = nil
         callback = nil
-        print("🔌 WebSocket session ended")
+        print("[TopicWebSocket] ✅ Session ended and cleaned up")
     }
     
     // MARK: - Private Methods
@@ -125,20 +144,47 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            if let httpResponse = response as? HTTPURLResponse {
+                print("❌ Session creation failed with status: \(httpResponse.statusCode)")
+            }
             throw TopicServiceError.sessionCreationFailed
+        }
+        
+        // デバッグ: 受信したJSONを出力
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("📥 Session response JSON: \(jsonString)")
         }
         
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let sessionResponse = try decoder.decode(CreateSessionResponse.self, from: data)
         
-        print("✅ Session created: \(sessionResponse.sessionId)")
-        
-        // 初期提案をコールバック
-        let initialTopics = sessionResponse.initialSuggestions.map { $0.text }
-        callback?(initialTopics)
-        
-        return sessionResponse.sessionId
+        do {
+            let sessionResponse = try decoder.decode(CreateSessionResponse.self, from: data)
+            print("✅ Session created: \(sessionResponse.sessionId)")
+            
+            // 初期提案をコールバック
+            let initialTopics = sessionResponse.initialSuggestions.map { $0.text }
+            callback?(initialTopics)
+            
+            return sessionResponse.sessionId
+        } catch {
+            print("❌ Failed to decode session response: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("❌ Key '\(key)' not found: \(context.debugDescription)")
+                case .typeMismatch(let type, let context):
+                    print("❌ Type mismatch for type \(type): \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("❌ Value not found for type \(type): \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    print("❌ Data corrupted: \(context.debugDescription)")
+                @unknown default:
+                    print("❌ Unknown decoding error")
+                }
+            }
+            throw error
+        }
     }
     
     /// WebSocket接続を確立
@@ -161,52 +207,80 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         webSocketTask = session.webSocketTask(with: url)
         webSocketTask?.resume()
         
-        print("🔌 WebSocket connected to \(url)")
+        print("🔌 WebSocket connecting to \(url)...")
+        
+        // 接続確認のためpingを送信
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            webSocketTask?.sendPing { error in
+                if let error = error {
+                    print("⚠️ WebSocket ping failed: \(error)")
+                } else {
+                    print("✅ WebSocket ping successful - connection established")
+                }
+                continuation.resume()
+            }
+        }
     }
     
     /// メッセージ受信を開始
     private func receiveMessage() {
-        guard isConnected else { return }
-        guard let task = webSocketTask else { return }
+        guard isConnected else {
+            print("[TopicWebSocket] ⚠️ receiveMessage: Not connected, skipping")
+            return
+        }
+        guard let task = webSocketTask else {
+            print("[TopicWebSocket] ⚠️ receiveMessage: WebSocketTask is nil")
+            return
+        }
+        
+        print("[TopicWebSocket] 👂 Waiting for next message...")
         
         task.receive { [weak self] result in
-            print("📩 Receive message with: \(result)")
             guard let self = self else { return }
             
             switch result {
             case .success(let message):
                 switch message {
                 case .data(let data):
+                    print("[TopicWebSocket] 📩 Received DATA message (\(data.count) bytes)")
                     self.handleReceivedData(data)
                 case .string(let string):
+                    print("[TopicWebSocket] 📩 Received STRING message (\(string.count) chars)")
+                    print("[TopicWebSocket] Content: \(string)")
                     if let data = string.data(using: .utf8) {
                         self.handleReceivedData(data)
+                    } else {
+                        print("[TopicWebSocket] ❌ Failed to convert string to data")
                     }
                 @unknown default:
-                    print("⚠️ Unknown message type received")
+                    print("[TopicWebSocket] ⚠️ Unknown message type received")
                 }
                 // 次のメッセージを受信
+                print("[TopicWebSocket] 🔄 Restarting receive loop...")
                 self.receiveMessage()
             case .failure(let error):
                 self.isConnected = false
-                print("❌ WebSocket receive error: \(error)")
+                print("[TopicWebSocket] ❌ WebSocket receive error: \(error.localizedDescription)")
+                print("[TopicWebSocket] ❌ Error details: \(error)")
             }
         }
     }
     
     /// 受信データを処理
     private func handleReceivedData(_ data: Data) {
+        print("[TopicWebSocket] 🔍 Processing received data (\(data.count) bytes)")
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         
         // デバッグ: 受信したJSONを出力
         if let jsonString = String(data: data, encoding: .utf8) {
-            print("📩 Received JSON: \(jsonString)")
+            print("[TopicWebSocket] 📩 Received JSON:")
+            print("[TopicWebSocket] \(jsonString)")
         }
         
         // まずエラーレスポンスかチェック
         if let errorResponse = try? decoder.decode(WebSocketErrorResponse.self, from: data) {
-            print("❌ Server error: \(errorResponse.error)")
+            print("[TopicWebSocket] ❌ Server returned error: \(errorResponse.error)")
             return
         }
         
@@ -214,10 +288,16 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         do {
             let response = try decoder.decode(WebSocketTopicResponse.self, from: data)
             let topics = response.suggestions.map { $0.text }
-            print("📥 Received \(topics.count) topics: \(topics)")
+            print("[TopicWebSocket] ✅ Successfully decoded \(topics.count) topics:")
+            for (index, topic) in topics.enumerated() {
+                print("[TopicWebSocket]   [\(index)] \(topic)")
+            }
+            print("[TopicWebSocket] 📞 Calling callback with topics...")
             callback?(topics)
+            print("[TopicWebSocket] ✅ Callback completed")
         } catch {
-            print("⚠️ Failed to decode response: \(error)")
+            print("[TopicWebSocket] ❌ Failed to decode response: \(error.localizedDescription)")
+            print("[TopicWebSocket] ❌ Decode error details: \(error)")
             if let decodingError = error as? DecodingError {
                 switch decodingError {
                 case .keyNotFound(let key, let context):
