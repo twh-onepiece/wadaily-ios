@@ -7,7 +7,7 @@
 	<key>NSmicrophoneUsageDescription</key>
 	<string>通話にマイクを使用します。</string>
 	<key>WadailyAPI</key>
-	<string>https://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp/</string>
+	<string>https://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

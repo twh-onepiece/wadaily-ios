@@ -24,7 +24,7 @@ class TalkViewModel: ObservableObject {
     
     // 音声設定
     private let SAMPLING_RATE = 24000 // サンプルレート (Hz)
-    private let MESSAGE_THRESHOLD = 5 // 話題提案を行うメッセージ数の閾値
+    private let MESSAGE_THRESHOLD = 10 // 話題提案を行うメッセージ数の閾値
     
     // STT APIリクエスト用バッファ設定
     private let STT_BUFFER_DURATION_MS = 3000 // STT APIに送信する音声の長さ (3秒)
@@ -51,7 +51,7 @@ class TalkViewModel: ObservableObject {
         partner: Caller,
         partnerSpeechToTextService: SpeechToTextServiceProtocol = SpeechToTextService(),
         mySpeechToTextService: SpeechToTextServiceProtocol = SpeechToTextService(),
-        topicWebSocketService: TopicWebSocketServiceProtocol = MockTopicWebSocketService()
+        topicWebSocketService: TopicWebSocketServiceProtocol = TopicWebSocketService()
     ) {
         self.me = me
         self.partner = partner
@@ -238,8 +238,6 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     }
     
     func didReceivePartnerAudioFrame(_ frame: AgoraAudioFrame) {
-        let frameId = UUID().uuidString.prefix(8)
-        
         // 相手のPCMデータを処理
         guard let buffer = frame.buffer else { return }
         

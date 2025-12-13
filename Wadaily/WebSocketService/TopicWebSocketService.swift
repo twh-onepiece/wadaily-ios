@@ -20,7 +20,7 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
     private var meProfile: UserProfile?
     private var partnerProfile: UserProfile?
     
-    init(baseURL: String = "https://your-api-domain.com") {
+    init(baseURL: String = "https://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp") {
         self.baseURL = baseURL
         self.sessionURL = "\(baseURL)/sessions"
     }
