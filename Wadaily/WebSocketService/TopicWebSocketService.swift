@@ -13,6 +13,7 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
     private var webSocketTask: URLSessionWebSocketTask?
     private var sessionId: String?
     private var callback: TopicReceivedCallback?
+    private var isConnected = false
     private let baseURL: String
     private let sessionURL: String
     
@@ -42,12 +43,18 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         // WebSocket接続を確立
         try await connectWebSocket(sessionId: sessionId)
         
-        // メッセージ受信を開始
-        await startReceiving()
+        isConnected = true
+        
+        // メッセージ受信の開始（接続確立後すぐに）
+        receiveMessage()
     }
     
     func pushMessages(_ messages: [ConversationMessage]) async throws {
-        guard webSocketTask != nil else {
+        guard let webSocketTask = webSocketTask else {
+            throw TopicServiceError.notConnected
+        }
+        
+        guard isConnected else {
             throw TopicServiceError.notConnected
         }
         
@@ -59,12 +66,19 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
         let data = try encoder.encode(request)
         
         let message = URLSessionWebSocketTask.Message.data(data)
-        try await webSocketTask?.send(message)
         
-        print("📤 Sent \(messages.count) messages to server")
+        do {
+            try await webSocketTask.send(message)
+            print("📤 Sent \(messages.count) messages to server")
+        } catch {
+            isConnected = false
+            print("❌ Failed to send messages")
+            throw error
+        }
     }
     
     func endSession() async {
+        isConnected = false
         // WebSocket接続を切断
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
@@ -132,7 +146,13 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
             throw TopicServiceError.invalidURL
         }
         
-        let session = URLSession(configuration: .default)
+        // URLSessionの設定
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 30
+        configuration.waitsForConnectivity = true
+        
+        let session = URLSession(configuration: configuration)
         webSocketTask = session.webSocketTask(with: url)
         webSocketTask?.resume()
         
@@ -140,30 +160,32 @@ class TopicWebSocketService: TopicWebSocketServiceProtocol {
     }
     
     /// メッセージ受信を開始
-    private func startReceiving() async {
-        guard let webSocketTask = webSocketTask else { return }
+    private func receiveMessage() {
+        guard isConnected else { return }
+        guard let task = webSocketTask else { return }
         
-        do {
-            let message = try await webSocketTask.receive()
+        task.receive { [weak self] result in
+            print("📩 Receive message with: \(result)")
+            guard let self = self else { return }
             
-            switch message {
-            case .data(let data):
-                handleReceivedData(data)
-            case .string(let string):
-                if let data = string.data(using: .utf8) {
-                    handleReceivedData(data)
+            switch result {
+            case .success(let message):
+                switch message {
+                case .data(let data):
+                    self.handleReceivedData(data)
+                case .string(let string):
+                    if let data = string.data(using: .utf8) {
+                        self.handleReceivedData(data)
+                    }
+                @unknown default:
+                    print("⚠️ Unknown message type received")
                 }
-            @unknown default:
-                print("⚠️ Unknown message type received")
+                // 次のメッセージを受信
+                self.receiveMessage()
+            case .failure(let error):
+                self.isConnected = false
+                print("❌ WebSocket receive error: \(error)")
             }
-            
-            // 次のメッセージを受信するために再帰呼び出し
-            await startReceiving()
-            
-        } catch {
-            print("❌ WebSocket receive error: \(error)")
-            // エラーが発生した場合は接続を終了
-            await endSession()
         }
     }
     

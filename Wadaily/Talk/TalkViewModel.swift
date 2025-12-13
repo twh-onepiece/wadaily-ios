@@ -45,6 +45,7 @@ class TalkViewModel: ObservableObject {
     // WebSocket接続状態フラグ
     private var isMySttConnected = false
     private var isPartnerSttConnected = false
+    private var isTopicWebSocketConnected = false
 
     init(
         me: Caller,
@@ -96,6 +97,7 @@ class TalkViewModel: ObservableObject {
                 // 話題提案API用セッション開始
                 print("🔌 [TalkViewModel] Starting Topic WebSocket session...")
                 try await topicWebSocketService.startSession(callback: onReceivedTopics)
+                isTopicWebSocketConnected = true
                 print("✅ [TalkViewModel] WebSocket session started for topic suggestions")
             } catch {
                 print("❌ [TalkViewModel] Failed to start sessions: \(error.localizedDescription)")
@@ -149,6 +151,12 @@ class TalkViewModel: ObservableObject {
     /// メッセージ数をチェックし、5件溜まったらサーバーにプッシュ
     private func checkAndPushMessages() {
         guard currentConversation.count >= MESSAGE_THRESHOLD else { return }
+        
+        // WebSocket接続が完了していない場合は送信しない
+        guard isTopicWebSocketConnected else {
+            print("⏸️ Topic WebSocket not connected yet, skipping push")
+            return
+        }
         
         let toPushMessages = currentConversation
         currentConversation = []
@@ -205,13 +213,10 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
                     Task.detached {
                         do {
                             try await self.mySpeechToTextService.sendAudioData(dataToSend)
-                            print("📤 Sent My buffered PCM data to STT API - Size: \(dataToSend.count) bytes (\(self.STT_BUFFER_DURATION_MS)ms)")
                         } catch {
                             print("❌ Failed to send my audio data: \(error)")
                         }
                     }
-                } else {
-                    print("⏸️ My STT not connected yet, discarding \(dataToSend.count) bytes")
                 }
             }
         }
@@ -234,6 +239,26 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     
     func didPartnerLeave(uid: UInt) {
         state = .callEnded
+        // まずAgoraチャンネルから離脱
+        agoraManager?.leaveChannel()
+        
+        // 接続フラグをリセット
+        isMySttConnected = false
+        isPartnerSttConnected = false
+        isTopicWebSocketConnected = false
+        
+        // バッファをクリア
+        bufferQueue.async { [weak self] in
+            self?.myAudioBuffer.removeAll()
+            self?.partnerAudioBuffer.removeAll()
+        }
+        
+        // その後、WebSocketセッションをクリーンアップ
+        Task {
+            await partnerSpeechToTextService.endSession()
+            await mySpeechToTextService.endSession()
+            await topicWebSocketService.endSession()
+        }
         print("Partner lefted with uid: \(uid)")
     }
     
@@ -263,13 +288,10 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
                     Task.detached {
                         do {
                             try await self.partnerSpeechToTextService.sendAudioData(dataToSend)
-                            print("📤 Sent Partner buffered PCM data to STT API - Size: \(dataToSend.count) bytes (\(self.STT_BUFFER_DURATION_MS)ms)")
                         } catch {
                             print("❌ Failed to send partner audio data: \(error)")
                         }
                     }
-                } else {
-                    print("⏸️ Partner STT not connected yet, discarding \(dataToSend.count) bytes")
                 }
             }
         }
@@ -293,7 +315,6 @@ extension TalkViewModel {
                     timestamp: Date()
                 )
                 currentConversation.append(message)
-                print("💬 [TalkViewModel-\(textId)] Added to conversation. Total: \(currentConversation.count) messages")
                 checkAndPushMessages()
             }
         case .failure(let error):
@@ -316,7 +337,6 @@ extension TalkViewModel {
                     timestamp: Date()
                 )
                 currentConversation.append(message)
-                print("💬 [TalkViewModel-\(textId)] Added to conversation. Total: \(currentConversation.count) messages")
                 checkAndPushMessages()
             }
         case .failure(let error):
