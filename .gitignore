@@ -41,6 +41,3 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 iOSInjectionProject/
-
-# Preview files for development
-*Preview.swift
