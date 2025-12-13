@@ -19,27 +19,30 @@ enum TalkViewState {
 class TalkViewModel: ObservableObject {
     @Published var state: TalkViewState = .disconnected
     @Published var isMuted: Bool = false
-    @Published var recognizedText: String = ""
     
-    // リモートユーザーのPCMデータストリーム
-    private var pcmDataBuffer = Data()
-    private let bufferSizeThreshold = 48000 * 2 // 1秒分のデータ (48kHz * 2 bytes per sample)
+    // 音声設定
+    private let SAMPLING_RATE = 24000 // サンプルレート (Hz)
     
     private let me: Caller
     private let partner: Caller
     
     private var agoraManager: AgoraManager?
     private var coordinator: AgoraEngineCoordinator?
-    private let speechToTextRepository: SpeechToTextRepositoryProtocol
+    // 相手用のSpeech-to-Textサービス
+    private let partnerSpeechToTextService: SpeechToTextRepositoryProtocol
+    // 自分用のSpeech-to-Textサービス
+    private let mySpeechToTextService: SpeechToTextRepositoryProtocol
 
     init(
         me: Caller,
         partner: Caller,
-        speechToTextRepository: SpeechToTextRepositoryProtocol = MockSpeechToTextRepository()
+        partnerSpeechToTextService: SpeechToTextRepositoryProtocol = MockSpeechToTextService(),
+        mySpeechToTextService: SpeechToTextRepositoryProtocol = MockSpeechToTextService()
     ) {
         self.me = me
         self.partner = partner
-        self.speechToTextRepository = speechToTextRepository
+        self.partnerSpeechToTextService = partnerSpeechToTextService
+        self.mySpeechToTextService = mySpeechToTextService
         coordinator = AgoraEngineCoordinator(delegate: self)
         if let coordinator = coordinator {
             agoraManager = AgoraManager(delegate: coordinator, audioFrameDelegate: coordinator)
@@ -59,6 +62,10 @@ class TalkViewModel: ObservableObject {
     }
     
     func leaveChannel() {
+        Task {
+            await partnerSpeechToTextService.endSession()
+            await mySpeechToTextService.endSession()
+        }
         agoraManager?.leaveChannel()
     }
     
@@ -68,6 +75,32 @@ class TalkViewModel: ObservableObject {
             agoraManager?.onMute()
         } else {
             agoraManager?.offMute()
+        }
+    }
+    
+    // MARK: - Speech-to-Text Callback
+    
+    /// 相手の音声からテキスト変換結果を受け取るコールバック関数
+    private func onReceivedPartnerText(_ result: Result<String, Error>) {
+        switch result {
+        case .success(let text):
+            Task { @MainActor in
+                print("📝 Partner recognized text: \(text)")
+            }
+        case .failure(let error):
+            print("❌ Partner speech to text conversion failed: \(error)")
+        }
+    }
+    
+    /// 自分の音声からテキスト変換結果を受け取るコールバック関数
+    private func onReceivedMyText(_ result: Result<String, Error>) {
+        switch result {
+        case .success(let text):
+            Task { @MainActor in
+                print("📝 My recognized text: \(text)")
+            }
+        case .failure(let error):
+            print("❌ My speech to text conversion failed: \(error)")
         }
     }
 }
@@ -82,6 +115,28 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     func didPartnerJoined(uid: UInt) {
         state = .talking
         print("Partner joined with uid: \(uid)")
+
+        Task {
+            do {
+                // 相手の音声用セッション開始
+                try await partnerSpeechToTextService.startSession(
+                    sampleRate: SAMPLING_RATE,
+                    channels: 1,
+                    callback: onReceivedPartnerText
+                )
+                print("🎤 Partner Speech-to-Text session started")
+                
+                // 自分の音声用セッション開始
+                try await mySpeechToTextService.startSession(
+                    sampleRate: SAMPLING_RATE,
+                    channels: 1,
+                    callback: onReceivedMyText
+                )
+                print("🎤 My Speech-to-Text session started")
+            } catch {
+                print("❌ Failed to start speech-to-text sessions: \(error)")
+            }
+        }
     }
     
     func didPartnerLeave(uid: UInt) {
@@ -97,40 +152,40 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     func didOccurError() {
     }
     
-    func didReceiveAudioFrame(_ frame: AgoraAudioFrame) {
-        // リモートユーザーのPCMデータのみを処理
+    func didReceivePartnerAudioFrame(_ frame: AgoraAudioFrame) {
+        // 相手のPCMデータを処理
         guard let buffer = frame.buffer else { return }
         
         // PCMデータを抽出 (16-bit samples)
         let byteCount = Int(frame.samplesPerChannel * frame.channels * 2)
         let pcmData = Data(bytes: buffer, count: byteCount)
         
-        // バッファに追加
-        pcmDataBuffer.append(pcmData)
+        // テキスト変換サービスに直接送信
+        Task {
+            do {
+                try await partnerSpeechToTextService.sendAudioData(pcmData)
+                print("📤 Sent Partner PCM data to service - Size: \(pcmData.count) bytes")
+            } catch {
+                print("❌ Failed to send partner audio data: \(error)")
+            }
+        }
+    }
+    
+    func didReceiveMyAudioFrame(_ frame: AgoraAudioFrame) {
+        // 自分のPCMデータを処理
+        guard let buffer = frame.buffer else { return }
         
-        // バッファが一定サイズに達したらテキスト変換APIに送信
-        if pcmDataBuffer.count >= bufferSizeThreshold {
-            let dataToSend = pcmDataBuffer
-            pcmDataBuffer.removeAll()
-            
-            // テキスト変換APIに送信
-            Task {
-                do {
-                    let text = try await speechToTextRepository.convertToText(
-                        pcmData: dataToSend,
-                        sampleRate: 48000,
-                        channels: 1
-                    )
-                    
-                    await MainActor.run {
-                        self.recognizedText += text + " "
-                    }
-                    
-                    print("📤 Sent PCM data to API - Size: \(dataToSend.count) bytes")
-                    print("📝 Recognized text: \(text)")
-                } catch {
-                    print("❌ Speech to text conversion failed: \(error)")
-                }
+        // PCMデータを抽出 (16-bit samples)
+        let byteCount = Int(frame.samplesPerChannel * frame.channels * 2)
+        let pcmData = Data(bytes: buffer, count: byteCount)
+        
+        // テキスト変換サービスに直接送信
+        Task {
+            do {
+                try await mySpeechToTextService.sendAudioData(pcmData)
+                print("📤 Sent My PCM data to service - Size: \(pcmData.count) bytes")
+            } catch {
+                print("❌ Failed to send my audio data: \(error)")
             }
         }
     }

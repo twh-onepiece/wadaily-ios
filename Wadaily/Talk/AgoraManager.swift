@@ -17,7 +17,8 @@ protocol AgoraEngineCoordinatorDelegate: AnyObject {
     func didPartnerLeave(uid: UInt)
     func didLeaveChannel()
     func didOccurError()
-    func didReceiveAudioFrame(_ frame: AgoraAudioFrame)
+    func didReceivePartnerAudioFrame(_ frame: AgoraAudioFrame)
+    func didReceiveMyAudioFrame(_ frame: AgoraAudioFrame)
 }
 
 // MARK: - Agora Manager
@@ -90,6 +91,14 @@ class AgoraManager: NSObject {
 class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate, AgoraAudioFrameDelegate {
     weak var delegate: AgoraEngineCoordinatorDelegate?
     
+    // 音声設定
+    private let SAMPLING_RATE = 24000 // サンプルレート (Hz)
+    private let BUFFER_DURATION = 3 // バッファリング時間 (秒)
+    
+    private var samplesPerCall: Int {
+        SAMPLING_RATE * BUFFER_DURATION
+    }
+    
     init(delegate: AgoraEngineCoordinatorDelegate) {
         self.delegate = delegate
         super.init()
@@ -97,69 +106,37 @@ class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate, AgoraAudioFrameD
     
     // MARK: - AgoraAudioFrameDelegate
     func onRecordAudioFrame(_ frame: AgoraAudioFrame, channelId: String) -> Bool {
-        // ローカルマイクからの音声フレームは使用しない
+        // ローカルマイクからの音声フレーム（自分の音声）
+        delegate?.didReceiveMyAudioFrame(frame)
         return true
     }
     
     func onPlaybackAudioFrame(_ frame: AgoraAudioFrame, channelId: String) -> Bool {
-        // リモートユーザーからの音声フレーム(再生前) - これをテキスト変換APIに流す
-        delegate?.didReceiveAudioFrame(frame)
-        return true
-    }
-    
-    func onMixedAudioFrame(_ frame: AgoraAudioFrame, channelId: String) -> Bool {
-        // ミックスされた音声フレームは使用しない
-        return true
-    }
-    
-    func onEarMonitoringAudioFrame(_ frame: AgoraAudioFrame) -> Bool {
-        // イヤモニタリングの音声フレームは使用しない
-        return true
-    }
-    
-    func onPlaybackAudioFrame(beforeMixing frame: AgoraAudioFrame, channelId: String, uid: UInt) -> Bool {
-        // 特定ユーザーからの音声フレーム(ミックス前)は使用しない
+        // リモートユーザーからの音声フレーム(再生前)（相手の音声）
+        delegate?.didReceivePartnerAudioFrame(frame)
         return true
     }
     
     func getObservedAudioFramePosition() -> AgoraAudioFramePosition {
-        // リモートユーザーの音声のみを取得
-        return .playback
+        // 自分と相手両方の音声を取得
+        return [.record, .playback]
     }
     
     func getRecordAudioParams() -> AgoraAudioParams {
         let params = AgoraAudioParams()
-        params.sampleRate = 48000
+        params.sampleRate = SAMPLING_RATE
         params.channel = 1
         params.mode = .readWrite
-        params.samplesPerCall = 1024
+        params.samplesPerCall = samplesPerCall
         return params
     }
     
     func getPlaybackAudioParams() -> AgoraAudioParams {
         let params = AgoraAudioParams()
-        params.sampleRate = 48000
+        params.sampleRate = SAMPLING_RATE
         params.channel = 1
         params.mode = .readWrite
-        params.samplesPerCall = 1024
-        return params
-    }
-    
-    func getMixedAudioParams() -> AgoraAudioParams {
-        let params = AgoraAudioParams()
-        params.sampleRate = 48000
-        params.channel = 1
-        params.mode = .readWrite
-        params.samplesPerCall = 1024
-        return params
-    }
-    
-    func getEarMonitoringAudioParams() -> AgoraAudioParams {
-        let params = AgoraAudioParams()
-        params.sampleRate = 48000
-        params.channel = 1
-        params.mode = .readWrite
-        params.samplesPerCall = 1024
+        params.samplesPerCall = samplesPerCall
         return params
     }
     
