@@ -93,10 +93,10 @@ class AgoraEngineCoordinator: NSObject, AgoraRtcEngineDelegate, AgoraAudioFrameD
     
     // 音声設定
     private let SAMPLING_RATE = 24000 // サンプルレート (Hz)
-    private let BUFFER_DURATION = 3 // バッファリング時間 (秒)
+    private let BUFFER_DURATION_MS = 100 // バッファリング時間 (ミリ秒) - リアルタイム通話用に100msに設定
     
     private var samplesPerCall: Int {
-        SAMPLING_RATE * BUFFER_DURATION
+        (SAMPLING_RATE * BUFFER_DURATION_MS) / 1000
     }
     
     init(delegate: AgoraEngineCoordinatorDelegate) {
