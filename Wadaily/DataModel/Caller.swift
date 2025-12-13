@@ -39,7 +39,7 @@ struct Caller: Identifiable, Equatable, Hashable {
     }
     
     static func from(_ account: Account) -> Self {
-        Caller(userId: account.userId, name: account.name, imageUrl: account.iconUrl, backgroundImageUrl: account.backgroundUrl, status: "online")
+        Caller(userId: account.userId, name: account.name, imageUrl: account.iconUrl, backgroundImageUrl: account.backgroundUrl, status: account.status)
     }
 }
 

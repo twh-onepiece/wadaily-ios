@@ -10,12 +10,11 @@ import SwiftUI
 struct DummyAccountSelectView: View {
     @ObservedObject var viewModel: AuthViewModel
     
-    let dummyAccounts = [
-        DummyAccount.urassh,
-        DummyAccount.sui,
-        DummyAccount.tsukasa,
-        DummyAccount.toku
-    ]
+    @State private var accounts: [Account] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    
+    private let accountRepository = AccountRepository()
     
     var body: some View {
         NavigationStack {
@@ -27,23 +26,50 @@ struct DummyAccountSelectView: View {
                         .font(.largeTitle.bold())
                         .foregroundColor(.white)
                     
-                    Text("ログインするダミーアカウントを選んでください")
+                    Text("ログインするアカウントを選んでください")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
                     
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            ForEach(dummyAccounts, id: \.id) { account in
-                                DummyAccountCell(account: account) {
-                                    viewModel.loginWithDummyAccount(account)
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                    } else if let error = errorMessage {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .padding()
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 16) {
+                                ForEach(accounts) { account in
+                                    DummyAccountCell(account: account) {
+                                        viewModel.loginWithDummyAccount(account)
+                                    }
                                 }
                             }
+                            .padding()
                         }
-                        .padding()
                     }
                 }
             }
+            .task {
+                await loadAccounts()
+            }
         }
+    }
+    
+    private func loadAccounts() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            accounts = try await accountRepository.fetchAll()
+        } catch {
+            errorMessage = "アカウントの取得に失敗しました"
+            print("Error loading accounts: \(error)")
+        }
+        
+        isLoading = false
     }
 }
 

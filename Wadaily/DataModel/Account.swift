@@ -16,39 +16,41 @@ struct Account: Identifiable, Codable {
     let intro: String          // 自己紹介用のテキスト
     let iconUrl: String        // アイコンのURL
     let backgroundUrl: String  // 背景画像のURL
-}
-
-struct DummyAccount {
-    static let urassh = Account(
-        id: UUID(),
-        userId: "urassh",
-        name: "うらっしゅ",
-        email: "urassh@example.com",
-        intro: "こんにちは。\n\nプログラミングが好きです。\n\n好きな言語は、swiftです。",
-        iconUrl: "guest1",
-        backgroundUrl: "back1")
-    static let sui = Account(
-        id: UUID(),
-        userId: "sui",
-        name: "すい",
-        email: "sui@example.com",
-        intro: "こんにちは。",
-        iconUrl: "guest2",
-        backgroundUrl: "back2")
-    static let tsukasa = Account(
-        id: UUID(),
-        userId: "tsukasa",
-        name: "つかさ",
-        email: "tsukasa@example.com",
-        intro: "こんにちは。",
-        iconUrl: "guest3",
-        backgroundUrl: "back3")
-    static let toku = Account(
-        id: UUID(),
-        userId: "cstoku",
-        name: "とく",
-        email: "cstoku@example.com",
-        intro: "こんにちは。",
-        iconUrl: "guest4",
-        backgroundUrl: "back4")
+    let status: String         // オンライン状態 (online/offline)
+    
+    var isOnline: Bool {
+        status == "online"
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case name, email, intro, status
+        case userId = "user_id"
+        case iconUrl = "icon_url"
+        case backgroundUrl = "background_url"
+    }
+    
+    // デコード時にidがなければ自動生成
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = UUID()
+        self.userId = try container.decode(String.self, forKey: .userId)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.email = try container.decode(String.self, forKey: .email)
+        self.intro = try container.decode(String.self, forKey: .intro)
+        self.iconUrl = try container.decode(String.self, forKey: .iconUrl)
+        self.backgroundUrl = try container.decode(String.self, forKey: .backgroundUrl)
+        self.status = try container.decodeIfPresent(String.self, forKey: .status) ?? "offline"
+    }
+    
+    // 通常のイニシャライザ
+    init(id: UUID = UUID(), userId: String, name: String, email: String, intro: String, iconUrl: String, backgroundUrl: String, status: String = "offline") {
+        self.id = id
+        self.userId = userId
+        self.name = name
+        self.email = email
+        self.intro = intro
+        self.iconUrl = iconUrl
+        self.backgroundUrl = backgroundUrl
+        self.status = status
+    }
 }

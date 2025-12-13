@@ -14,6 +14,7 @@ class AuthViewModel: ObservableObject {
     @Published var errorMessage: String?
     
     private let authRepository: AuthRepositoryProtocol
+    private let accountRepository = AccountRepository()
     private let accountManager = AccountManager.shared
     
     init(authRepository: AuthRepositoryProtocol) {
@@ -25,6 +26,8 @@ class AuthViewModel: ObservableObject {
         authState = .loading
         Task {
             if let account = accountManager.currentAccount {
+                // ログイン済みならオンラインに更新
+                try? await accountRepository.updateStatus(userId: account.userId, status: "online")
                 authState = .authenticated(account)
             } else {
                 authState = .unauthenticated
@@ -73,6 +76,10 @@ class AuthViewModel: ObservableObject {
     
     func logout() async {
         do {
+            // オフラインに更新
+            if let account = accountManager.currentAccount {
+                try? await accountRepository.updateStatus(userId: account.userId, status: "offline")
+            }
             try await authRepository.logout()
             accountManager.logout()
             authState = .unauthenticated
@@ -83,6 +90,10 @@ class AuthViewModel: ObservableObject {
     
     // ダミーアカウントでログイン
     func loginWithDummyAccount(_ account: Account) {
+        Task {
+            // オンラインに更新
+            try? await accountRepository.updateStatus(userId: account.userId, status: "online")
+        }
         accountManager.saveAccount(account)
         authState = .authenticated(account)
     }

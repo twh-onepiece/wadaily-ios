@@ -18,7 +18,7 @@ class DiscoverViewModel: ObservableObject {
     
     init(me: Caller) {
         self.me = me
-        self.repository = MockCallerRepository()
+        self.repository = CallerRepository()
     }
     
     func fetchPartners() async {

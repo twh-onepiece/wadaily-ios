@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		10799A242ED89CB100CEC295 /* RtcBasic in Frameworks */ = {isa = PBXBuildFile; productRef = 10799A232ED89CB100CEC295 /* RtcBasic */; };
+		8F673B3A2EED059300542C6A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 8F673B392EED059300542C6A /* Supabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8F673B3A2EED059300542C6A /* Supabase in Frameworks */,
 				10799A242ED89CB100CEC295 /* RtcBasic in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -84,6 +86,7 @@
 			name = Wadaily;
 			packageProductDependencies = (
 				10799A232ED89CB100CEC295 /* RtcBasic */,
+				8F673B392EED059300542C6A /* Supabase */,
 			);
 			productName = Wadaily;
 			productReference = 10799A142ED88C1D00CEC295 /* Wadaily.app */;
@@ -115,6 +118,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				10799A222ED89CB100CEC295 /* XCRemoteSwiftPackageReference "AgoraRtcEngine_iOS" */,
+				8F673B382EED059300542C6A /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 10799A152ED88C1D00CEC295 /* Products */;
@@ -372,6 +376,14 @@
 				minimumVersion = 4.6.0;
 			};
 		};
+		8F673B382EED059300542C6A /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -379,6 +391,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 10799A222ED89CB100CEC295 /* XCRemoteSwiftPackageReference "AgoraRtcEngine_iOS" */;
 			productName = RtcBasic;
+		};
+		8F673B392EED059300542C6A /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8F673B382EED059300542C6A /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -7,6 +7,8 @@
 
 protocol AccountRepositoryProtocol {
     func register(account: Account) async throws -> Account
-    func find(id: String) async throws -> Account
+    func find(userId: String) async throws -> Account
     func update(account: Account) async throws -> Account
+    func fetchAll() async throws -> [Account]
+    func updateStatus(userId: String, status: String) async throws
 }

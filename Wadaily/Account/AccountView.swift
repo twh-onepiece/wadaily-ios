@@ -217,6 +217,17 @@ extension AccountView {
 }
 
 #Preview {
-    AccountView(me: DummyAccount.urassh, authViewModel: AuthViewModel(authRepository: MockAuthRepository()))
+    AccountView(
+        me: Account(
+            id: UUID(),
+            userId: "preview",
+            name: "プレビュー",
+            email: "preview@example.com",
+            intro: "プレビュー用のアカウントです",
+            iconUrl: "guest1",
+            backgroundUrl: "back1"
+        ),
+        authViewModel: AuthViewModel(authRepository: MockAuthRepository())
+    )
 }
 
