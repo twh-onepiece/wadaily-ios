@@ -84,15 +84,36 @@ class MockSpeechToTextService: SpeechToTextServiceProtocol {
          self.callback = callback
         
          // WebSocket接続の実装
-         guard let url = URL(string: "wss://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp/transcript/connect") else {
-             print("❌ [STT-\(sessionId)] Invalid WebSocket URL")
+         // TODO: 正しいWebSocketエンドポイントURLを設定してください
+         // 現在のURLはテスト用です。実際のサーバーURLに置き換える必要があります。
+         let websocketURLString = "wss://app-253151b9-60c4-47f1-b33f-7c028738cde8.ingress.apprun.sakura.ne.jp/transcript/connect"
+         
+         guard let url = URL(string: websocketURLString) else {
+             print("❌ [STT-\(sessionId)] Invalid WebSocket URL: \(websocketURLString)")
              throw NSError(domain: "SpeechToTextService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
          }
         
+         // URLスキームの検証
+         guard url.scheme == "wss" || url.scheme == "ws" else {
+             print("❌ [STT-\(sessionId)] Invalid URL scheme: \(url.scheme ?? "nil"). Expected 'wss' or 'ws'")
+             throw NSError(domain: "SpeechToTextService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL scheme. Expected WebSocket (wss:// or ws://)"])
+         }
+        
          print("🔌 [STT-\(sessionId)] Connecting to: \(url.absoluteString)")
-         let session = URLSession(configuration: .default)
+         print("🔌 [STT-\(sessionId)] URL scheme: \(url.scheme ?? "nil"), host: \(url.host ?? "nil"), path: \(url.path)")
+         
+         // URLSessionの設定を改善
+         let configuration = URLSessionConfiguration.default
+         configuration.timeoutIntervalForRequest = 30
+         configuration.timeoutIntervalForResource = 30
+         configuration.waitsForConnectivity = true
+         
+         let session = URLSession(configuration: configuration)
          webSocketTask = session.webSocketTask(with: url)
+         
+         print("🔌 [STT-\(sessionId)] WebSocket task created, resuming connection...")
          webSocketTask?.resume()
+         print("🔌 [STT-\(sessionId)] WebSocket task resumed")
         
          print("✅ [STT-\(sessionId)] WebSocket connection initiated")
          
