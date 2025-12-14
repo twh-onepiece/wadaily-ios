@@ -63,7 +63,7 @@ class TalkViewModel: ObservableObject {
     
     // 音声設定
     private let SAMPLING_RATE = 24000 // サンプルレート (Hz)
-    private let MESSAGE_THRESHOLD = 5 // 話題提案を行うメッセージ数の閾値
+    private let MESSAGE_THRESHOLD = 10 // 話題提案を行うメッセージ数の閾値
     
     // STT APIリクエスト用バッファ設定
     private let STT_BUFFER_DURATION_MS = 3000 // STT APIに送信する音声の長さ (3秒)
@@ -80,13 +80,18 @@ class TalkViewModel: ObservableObject {
     private let mySpeechToTextService: SpeechToTextServiceProtocol      // 自分用のSpeech-to-Textサービス
     private let topicWebSocketService: TopicWebSocketServiceProtocol    // 話題提案用のWebSocketサービス
     private var lastPushedMessageCount = 0
+    
+    // WebSocket接続状態フラグ
+    private var isMySttConnected = false
+    private var isPartnerSttConnected = false
+    private var isTopicWebSocketConnected = false
 
     init(
         me: Caller,
         partner: Caller,
-        partnerSpeechToTextService: SpeechToTextServiceProtocol = MockSpeechToTextService(),
-        mySpeechToTextService: SpeechToTextServiceProtocol = MockSpeechToTextService(),
-        topicWebSocketService: TopicWebSocketServiceProtocol = MockTopicWebSocketService()
+        partnerSpeechToTextService: SpeechToTextServiceProtocol = SpeechToTextService(),
+        mySpeechToTextService: SpeechToTextServiceProtocol = SpeechToTextService(),
+        topicWebSocketService: TopicWebSocketServiceProtocol = TopicWebSocketService()
     ) {
         self.me = me
         self.partner = partner
@@ -100,29 +105,36 @@ class TalkViewModel: ObservableObject {
     }
     
     private func setupWebSoketSessions() {
+        print("🔌 [TalkViewModel] Setting up WebSocket sessions...")
         Task {
             do {
                 // 自分の音声用セッション開始
+                print("🎤 [TalkViewModel] Starting My Speech-to-Text session...")
                 try await mySpeechToTextService.startSession(
                     sampleRate: SAMPLING_RATE,
                     channels: 1,
                     callback: onReceivedMyText
                 )
-                print("🎤 My Speech-to-Text session started")
+                isMySttConnected = true
+                print("✅ [TalkViewModel] My Speech-to-Text session started")
 
                 // 相手の音声用セッション開始
+                print("🎤 [TalkViewModel] Starting Partner Speech-to-Text session...")
                 try await partnerSpeechToTextService.startSession(
                     sampleRate: SAMPLING_RATE,
                     channels: 1,
                     callback: onReceivedPartnerText
                 )
-                print("🎤 Partner Speech-to-Text session started")
+                isPartnerSttConnected = true
+                print("✅ [TalkViewModel] Partner Speech-to-Text session started")
                 
                 // 話題提案API用セッション開始
+                print("🔌 [TalkViewModel] Starting Topic WebSocket session...")
                 try await topicWebSocketService.startSession(callback: onReceivedTopics)
-                print("🔌 WebSocket session started for topic suggestions")
+                isTopicWebSocketConnected = true
+                print("✅ [TalkViewModel] WebSocket session started for topic suggestions")
             } catch {
-                print("❌ Failed to start sessions: \(error)")
+                print("❌ [TalkViewModel] Failed to start sessions: \(error.localizedDescription)")
             }
         }
     }
@@ -142,6 +154,10 @@ class TalkViewModel: ObservableObject {
     func leaveChannel() {
         // まずAgoraチャンネルから離脱
         agoraManager?.leaveChannel()
+        
+        // 接続フラグをリセット
+        isMySttConnected = false
+        isPartnerSttConnected = false
         
         // バッファをクリア
         bufferQueue.async { [weak self] in
@@ -170,9 +186,11 @@ class TalkViewModel: ObservableObject {
     private func checkAndPushMessages() {
         guard currentConversation.count >= MESSAGE_THRESHOLD else { return }
         
-        let pushId = UUID().uuidString.prefix(8)
-        PerformanceLogger.start("PushMessages-\(pushId)")
-        PerformanceLogger.log("PushMessages-\(pushId): Pushing \(currentConversation.count) messages")
+        // WebSocket接続が完了していない場合は送信しない
+        guard isTopicWebSocketConnected else {
+            print("⏸️ Topic WebSocket not connected yet, skipping push")
+            return
+        }
         
         let toPushMessages = currentConversation
         currentConversation = []
@@ -181,10 +199,8 @@ class TalkViewModel: ObservableObject {
         Task {
             do {
                 try await topicWebSocketService.pushMessages(toPushMessages)
-                PerformanceLogger.end("PushMessages-\(pushId)")
                 print("💬 Pushed \(toPushMessages.count) messages to server")
             } catch {
-                PerformanceLogger.end("PushMessages-\(pushId)")
                 print("❌ Failed to push messages: \(error)")
             }
         }
@@ -206,12 +222,8 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     }
     
     func didReceiveMyAudioFrame(_ frame: AgoraAudioFrame) {
-        let frameId = UUID().uuidString.prefix(8)
-        PerformanceLogger.start("MyAudioFrame-\(frameId)")
-        
         // 自分のPCMデータを処理
         guard let buffer = frame.buffer else { 
-            PerformanceLogger.log("MyAudioFrame-\(frameId): buffer is nil")
             return 
         }
         
@@ -232,21 +244,19 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
                 let dataToSend = self.myAudioBuffer
                 self.myAudioBuffer.removeAll(keepingCapacity: true)
                 
-                // STT APIに送信（非同期・待たない）
-                Task.detached {
-                    PerformanceLogger.start("MyAudioSend-\(frameId)")
-                    do {
-                        try await self.mySpeechToTextService.sendAudioData(dataToSend)
-                        PerformanceLogger.end("MyAudioSend-\(frameId)")
-                        print("📤 Sent My buffered PCM data to STT API - Size: \(dataToSend.count) bytes (\(self.STT_BUFFER_DURATION_MS)ms)")
-                    } catch {
-                        PerformanceLogger.end("MyAudioSend-\(frameId)")
-                        print("❌ Failed to send my audio data: \(error)")
+                // WebSocket接続が確立されている場合のみ送信
+                if self.isMySttConnected {
+                    // STT APIに送信（非同期・待たない）
+                    Task.detached {
+                        do {
+                            try await self.mySpeechToTextService.sendAudioData(dataToSend)
+                        } catch {
+                            print("❌ Failed to send my audio data: \(error)")
+                        }
                     }
                 }
             }
         }
-        PerformanceLogger.end("MyAudioFrame-\(frameId)")
     }
     
     func didOccurError() {
@@ -266,16 +276,32 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     
     func didPartnerLeave(uid: UInt) {
         state = .callEnded
+        // まずAgoraチャンネルから離脱
+        agoraManager?.leaveChannel()
+        
+        // 接続フラグをリセット
+        isMySttConnected = false
+        isPartnerSttConnected = false
+        isTopicWebSocketConnected = false
+        
+        // バッファをクリア
+        bufferQueue.async { [weak self] in
+            self?.myAudioBuffer.removeAll()
+            self?.partnerAudioBuffer.removeAll()
+        }
+        
+        // その後、WebSocketセッションをクリーンアップ
+        Task {
+            await partnerSpeechToTextService.endSession()
+            await mySpeechToTextService.endSession()
+            await topicWebSocketService.endSession()
+        }
         print("Partner lefted with uid: \(uid)")
     }
     
     func didReceivePartnerAudioFrame(_ frame: AgoraAudioFrame) {
-        let frameId = UUID().uuidString.prefix(8)
-        PerformanceLogger.start("PartnerAudioFrame-\(frameId)")
-        
         // 相手のPCMデータを処理
         guard let buffer = frame.buffer else { 
-            PerformanceLogger.log("PartnerAudioFrame-\(frameId): buffer is nil")
             return 
         }
         
@@ -296,21 +322,19 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
                 let dataToSend = self.partnerAudioBuffer
                 self.partnerAudioBuffer.removeAll(keepingCapacity: true)
                 
-                // STT APIに送信（非同期・待たない）
-                Task.detached {
-                    PerformanceLogger.start("PartnerAudioSend-\(frameId)")
-                    do {
-                        try await self.partnerSpeechToTextService.sendAudioData(dataToSend)
-                        PerformanceLogger.end("PartnerAudioSend-\(frameId)")
-                        print("📤 Sent Partner buffered PCM data to STT API - Size: \(dataToSend.count) bytes (\(self.STT_BUFFER_DURATION_MS)ms)")
-                    } catch {
-                        PerformanceLogger.end("PartnerAudioSend-\(frameId)")
-                        print("❌ Failed to send partner audio data: \(error)")
+                // WebSocket接続が確立されている場合のみ送信
+                if self.isPartnerSttConnected {
+                    // STT APIに送信（非同期・待たない）
+                    Task.detached {
+                        do {
+                            try await self.partnerSpeechToTextService.sendAudioData(dataToSend)
+                        } catch {
+                            print("❌ Failed to send partner audio data: \(error)")
+                        }
                     }
                 }
             }
         }
-        PerformanceLogger.end("PartnerAudioFrame-\(frameId)")
     }
 }
 
@@ -319,14 +343,12 @@ extension TalkViewModel {
     /// 自分の音声からテキスト変換結果を受け取るコールバック関数
     private func onReceivedMyText(_ result: Result<String, Error>) {
         let textId = UUID().uuidString.prefix(8)
-        PerformanceLogger.start("MyTextReceived-\(textId)")
+        print("📥 [TalkViewModel-\(textId)] Callback invoked for MY text")
         
         switch result {
         case .success(let text):
-            PerformanceLogger.log("MyTextReceived-\(textId): Text length \(text.count)")
+            print("📝 [TalkViewModel-\(textId)] My recognized text: \(text)")
             Task { @MainActor in
-                PerformanceLogger.start("MyTextMainActor-\(textId)")
-                print("📝 My recognized text: \(text)")
                 let message = ConversationMessage(
                     userId: me.talkId,
                     text: text,
@@ -334,26 +356,21 @@ extension TalkViewModel {
                 )
                 currentConversation.append(message)
                 checkAndPushMessages()
-                PerformanceLogger.end("MyTextMainActor-\(textId)")
-                PerformanceLogger.end("MyTextReceived-\(textId)")
             }
         case .failure(let error):
-            PerformanceLogger.end("MyTextReceived-\(textId)")
-            print("❌ My speech to text conversion failed: \(error)")
+            print("❌ [TalkViewModel-\(textId)] My speech to text conversion failed: \(error.localizedDescription)")
         }
     }
     
     /// 相手の音声からテキスト変換結果を受け取るコールバック関数
     private func onReceivedPartnerText(_ result: Result<String, Error>) {
         let textId = UUID().uuidString.prefix(8)
-        PerformanceLogger.start("PartnerTextReceived-\(textId)")
+        print("📥 [TalkViewModel-\(textId)] Callback invoked for PARTNER text")
         
         switch result {
         case .success(let text):
-            PerformanceLogger.log("PartnerTextReceived-\(textId): Text length \(text.count)")
+            print("📝 [TalkViewModel-\(textId)] Partner recognized text: \(text)")
             Task { @MainActor in
-                PerformanceLogger.start("PartnerTextMainActor-\(textId)")
-                print("📝 Partner recognized text: \(text)")
                 let message = ConversationMessage(
                     userId: partner.talkId,
                     text: text,
@@ -361,27 +378,18 @@ extension TalkViewModel {
                 )
                 currentConversation.append(message)
                 checkAndPushMessages()
-                PerformanceLogger.end("PartnerTextMainActor-\(textId)")
-                PerformanceLogger.end("PartnerTextReceived-\(textId)")
             }
         case .failure(let error):
-            PerformanceLogger.end("PartnerTextReceived-\(textId)")
-            print("❌ Partner speech to text conversion failed: \(error)")
+            print("❌ [TalkViewModel-\(textId)] Partner speech to text conversion failed: \(error.localizedDescription)")
         }
     }
     
     /// WebSocketから話題提案を受け取るコールバック関数
     private func onReceivedTopics(_ topics: [String]) {
-        let topicId = UUID().uuidString.prefix(8)
-        PerformanceLogger.start("TopicsReceived-\(topicId)")
-        PerformanceLogger.log("TopicsReceived-\(topicId): \(topics.count) topics")
-        
         Task { @MainActor in
-            PerformanceLogger.start("TopicsMainActor-\(topicId)")
+            print("==================SUCCESS=======================")
             print("💡 Received topics: \(topics)")
             suggestedTopics = topics
-            PerformanceLogger.end("TopicsMainActor-\(topicId)")
-            PerformanceLogger.end("TopicsReceived-\(topicId)")
         }
     }
     
