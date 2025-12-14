@@ -8,6 +8,38 @@
 import Combine
 import AgoraRtcKit
 
+// MARK: - Performance Logger
+class PerformanceLogger {
+    private static var startTimes: [String: Date] = [:]
+    
+    static func start(_ label: String) {
+        let timestamp = Date()
+        startTimes[label] = timestamp
+        print("⏱️ [START] \(label) at \(formatTime(timestamp))")
+    }
+    
+    static func end(_ label: String) {
+        let endTime = Date()
+        if let startTime = startTimes[label] {
+            let duration = endTime.timeIntervalSince(startTime) * 1000 // ミリ秒
+            print("⏱️ [END] \(label) - Duration: \(String(format: "%.2f", duration))ms")
+            startTimes.removeValue(forKey: label)
+        } else {
+            print("⏱️ [END] \(label) at \(formatTime(endTime)) (no start time)")
+        }
+    }
+    
+    static func log(_ message: String) {
+        print("⏱️ [LOG] \(message) at \(formatTime(Date()))")
+    }
+    
+    private static func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        return formatter.string(from: date)
+    }
+}
+
 enum TalkViewState {
     case disconnected      // 未接続
     case connecting        // 接続中
@@ -16,10 +48,17 @@ enum TalkViewState {
     case callEnded         // 通話終了
 }
 
+struct LocalConversationMessage: Identifiable {
+    let id = UUID()
+    let userId: UInt
+    let text: String
+    let timestamp: Date
+}
+
 class TalkViewModel: ObservableObject {
     @Published var state: TalkViewState = .disconnected
     @Published var isMuted: Bool = false
-    @Published var currentConversation: [ConversationMessage] = []
+    @Published var currentConversation: [LocalConversationMessage] = []
     @Published var suggestedTopics: [String] = []
     
     // 音声設定
@@ -63,11 +102,6 @@ class TalkViewModel: ObservableObject {
         if let coordinator = coordinator {
             agoraManager = AgoraManager(delegate: coordinator, audioFrameDelegate: coordinator)
         }
-        
-        // ユーザープロファイルをWebSocketサービスに設定
-        let meProfile = UserProfile(userId: me.userId, snsData: SNSData.dummy(for: me.userId))
-        let partnerProfile = UserProfile(userId: partner.userId, snsData: SNSData.dummy(for: partner.userId))
-        topicWebSocketService.setUserProfiles(me: meProfile, partner: partnerProfile)
     }
     
     private func setupWebSoketSessions() {
@@ -161,11 +195,20 @@ class TalkViewModel: ObservableObject {
         let toPushMessages = currentConversation
         currentConversation = []
         
+        // LocalConversationMessageをConversationMessage(Codable)に変換
+        let codableMessages = toPushMessages.map { localMsg in
+            ConversationMessage(
+                userId: localMsg.userId,
+                text: localMsg.text,
+                timestamp: localMsg.timestamp
+            )
+        }
+        
         // 非同期でメッセージをプッシュ（待たない）
         Task {
             do {
-                try await topicWebSocketService.pushMessages(toPushMessages)
-                print("💬 Pushed \(toPushMessages.count) messages to server")
+                try await topicWebSocketService.pushMessages(codableMessages)
+                print("💬 Pushed \(codableMessages.count) messages to server")
             } catch {
                 print("❌ Failed to push messages: \(error)")
             }
@@ -189,7 +232,9 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     
     func didReceiveMyAudioFrame(_ frame: AgoraAudioFrame) {
         // 自分のPCMデータを処理
-        guard let buffer = frame.buffer else { return }
+        guard let buffer = frame.buffer else { 
+            return 
+        }
         
         // PCMデータを抽出 (16-bit samples)
         let byteCount = Int(frame.samplesPerChannel * frame.channels * 2)
@@ -264,7 +309,9 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
     
     func didReceivePartnerAudioFrame(_ frame: AgoraAudioFrame) {
         // 相手のPCMデータを処理
-        guard let buffer = frame.buffer else { return }
+        guard let buffer = frame.buffer else { 
+            return 
+        }
         
         // PCMデータを抽出 (16-bit samples)
         let byteCount = Int(frame.samplesPerChannel * frame.channels * 2)
@@ -309,7 +356,7 @@ extension TalkViewModel {
         case .success(let text):
             print("📝 [TalkViewModel-\(textId)] My recognized text: \(text)")
             Task { @MainActor in
-                let message = ConversationMessage(
+                let message = LocalConversationMessage(
                     userId: me.talkId,
                     text: text,
                     timestamp: Date()
@@ -331,7 +378,7 @@ extension TalkViewModel {
         case .success(let text):
             print("📝 [TalkViewModel-\(textId)] Partner recognized text: \(text)")
             Task { @MainActor in
-                let message = ConversationMessage(
+                let message = LocalConversationMessage(
                     userId: partner.talkId,
                     text: text,
                     timestamp: Date()
@@ -352,4 +399,17 @@ extension TalkViewModel {
             suggestedTopics = topics
         }
     }
+    
+    // MARK: - Test Helpers
+    #if DEBUG
+    /// テスト用：話題を手動で設定
+    func setTestTopics(_ topics: [String]) {
+        suggestedTopics = topics
+    }
+    
+    /// テスト用：状態を手動で設定
+    func setTestState(_ newState: TalkViewState) {
+        state = newState
+    }
+    #endif
 }           
