@@ -19,6 +19,13 @@ struct TalkView: View {
         _viewModel = StateObject(wrappedValue: TalkViewModel(me: me, partner: partner))
     }
     
+    /// テスト用のinit（外部からviewModelを注入）
+    init(me: Caller, partner: Caller, viewModel: TalkViewModel) {
+        self.me = me
+        self.partner = partner
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+    
     private var stateText: String {
         switch viewModel.state {
         case .disconnected:
@@ -45,7 +52,12 @@ struct TalkView: View {
             .ignoresSafeArea()
             
             VStack(spacing: 40) {
-                Spacer()
+                // 通話中はSpacerを小さくしてアイコンが上にはみ出さないようにする
+                if viewModel.state == .talking {
+                    Spacer().frame(height: 20)
+                } else {
+                    Spacer()
+                }
                 
                 // 相手のアイコン
                 VStack(spacing: 20) {
@@ -97,13 +109,24 @@ struct TalkView: View {
                     }
                 }
                 
-                Spacer()
-                
-                // コントロールボタン
+                // 話題提案エリア（通話中は常にスペースを確保）
                 if viewModel.state == .talking {
+                    if !viewModel.suggestedTopics.isEmpty {
+                        TopicSuggestionView(
+                            topics: viewModel.suggestedTopics
+                        )
+                        .padding(.horizontal, 20)
+                    } else {
+                        // 話題がなくてもスペースを確保
+                        Spacer().frame(height: 100)
+                    }
+                    
                     talkingButtons
-                        .padding(.bottom, 50)
+                        .padding(.top, 4)
+                        .padding(.bottom, 120)
                 } else {
+                    Spacer().frame(minHeight: 40)
+                    
                     // 通話開始ボタン
                     Button(action: {
                         viewModel.joinChannel()
@@ -119,8 +142,6 @@ struct TalkView: View {
                     }
                     .padding(.bottom, 50)
                 }
-                
-                Spacer()
             }
         }
     }
