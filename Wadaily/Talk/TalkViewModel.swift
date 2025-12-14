@@ -352,4 +352,17 @@ extension TalkViewModel {
             suggestedTopics = topics
         }
     }
+    
+    // MARK: - Test Helpers
+    #if DEBUG
+    /// テスト用：話題を手動で設定
+    func setTestTopics(_ topics: [String]) {
+        suggestedTopics = topics
+    }
+    
+    /// テスト用：状態を手動で設定
+    func setTestState(_ newState: TalkViewState) {
+        state = newState
+    }
+    #endif
 }           
