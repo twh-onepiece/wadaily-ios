@@ -48,7 +48,7 @@ enum TalkViewState {
     case callEnded         // 通話終了
 }
 
-struct ConversationMessage: Identifiable {
+struct LocalConversationMessage: Identifiable {
     let id = UUID()
     let userId: UInt
     let text: String
@@ -58,7 +58,7 @@ struct ConversationMessage: Identifiable {
 class TalkViewModel: ObservableObject {
     @Published var state: TalkViewState = .disconnected
     @Published var isMuted: Bool = false
-    @Published var currentConversation: [ConversationMessage] = []
+    @Published var currentConversation: [LocalConversationMessage] = []
     @Published var suggestedTopics: [String] = []
     
     // 音声設定
@@ -195,11 +195,20 @@ class TalkViewModel: ObservableObject {
         let toPushMessages = currentConversation
         currentConversation = []
         
+        // LocalConversationMessageをConversationMessage(Codable)に変換
+        let codableMessages = toPushMessages.map { localMsg in
+            ConversationMessage(
+                userId: localMsg.userId,
+                text: localMsg.text,
+                timestamp: localMsg.timestamp
+            )
+        }
+        
         // 非同期でメッセージをプッシュ（待たない）
         Task {
             do {
-                try await topicWebSocketService.pushMessages(toPushMessages)
-                print("💬 Pushed \(toPushMessages.count) messages to server")
+                try await topicWebSocketService.pushMessages(codableMessages)
+                print("💬 Pushed \(codableMessages.count) messages to server")
             } catch {
                 print("❌ Failed to push messages: \(error)")
             }
@@ -230,7 +239,6 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
         // PCMデータを抽出 (16-bit samples)
         let byteCount = Int(frame.samplesPerChannel * frame.channels * 2)
         let pcmData = Data(bytes: buffer, count: byteCount)
-        PerformanceLogger.log("MyAudioFrame-\(frameId): PCM data extracted (\(pcmData.count) bytes)")
         
         // バッファに追加して、一定サイズになったらSTT APIに送信
         bufferQueue.async { [weak self] in
@@ -308,7 +316,6 @@ extension TalkViewModel: AgoraEngineCoordinatorDelegate {
         // PCMデータを抽出 (16-bit samples)
         let byteCount = Int(frame.samplesPerChannel * frame.channels * 2)
         let pcmData = Data(bytes: buffer, count: byteCount)
-        PerformanceLogger.log("PartnerAudioFrame-\(frameId): PCM data extracted (\(pcmData.count) bytes)")
         
         // バッファに追加して、一定サイズになったらSTT APIに送信
         bufferQueue.async { [weak self] in
@@ -349,7 +356,7 @@ extension TalkViewModel {
         case .success(let text):
             print("📝 [TalkViewModel-\(textId)] My recognized text: \(text)")
             Task { @MainActor in
-                let message = ConversationMessage(
+                let message = LocalConversationMessage(
                     userId: me.talkId,
                     text: text,
                     timestamp: Date()
@@ -371,7 +378,7 @@ extension TalkViewModel {
         case .success(let text):
             print("📝 [TalkViewModel-\(textId)] Partner recognized text: \(text)")
             Task { @MainActor in
-                let message = ConversationMessage(
+                let message = LocalConversationMessage(
                     userId: partner.talkId,
                     text: text,
                     timestamp: Date()
